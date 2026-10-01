@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
+import { isFilePath, openFileInViewer } from "../core/navigation";
 
 export function Markdown({ children }: { children: string }) {
   return (
@@ -18,12 +19,43 @@ export function Markdown({ children }: { children: string }) {
             const lang = /language-([\w-]+)/.exec(className)?.[1];
             return <CodeBlock code={raw} lang={lang} />;
           },
-          code: (props: any) => <code className={props.className}>{props.children}</code>,
-          a: (props: any) => (
-            <a href={props.href} target="_blank" rel="noreferrer noopener">
-              {props.children}
-            </a>
-          ),
+          code: (props: any) => {
+            const text = String(props.children ?? "");
+            // Inline code that looks like a project file path becomes clickable.
+            if (!props.className && isFilePath(text)) {
+              return (
+                <code
+                  className="cursor-pointer"
+                  style={{ textDecoration: "underline", textDecorationStyle: "dotted" }}
+                  onClick={() => openFileInViewer(text)}
+                >
+                  {props.children}
+                </code>
+              );
+            }
+            return <code className={props.className}>{props.children}</code>;
+          },
+          a: (props: any) => {
+            const href: string = props.href ?? "";
+            if (isFilePath(href)) {
+              return (
+                <a
+                  href={href}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openFileInViewer(href);
+                  }}
+                >
+                  {props.children}
+                </a>
+              );
+            }
+            return (
+              <a href={href} target="_blank" rel="noreferrer noopener">
+                {props.children}
+              </a>
+            );
+          },
         }}
       >
         {children}

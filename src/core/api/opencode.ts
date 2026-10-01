@@ -21,6 +21,8 @@ import type {
   PermissionRequest,
   PermissionReply,
   PromptFileInput,
+  ShellInfo,
+  ShellOutput,
 } from "../types";
 
 export class ApiError extends Error {
@@ -176,6 +178,8 @@ export const api = {
 
   revertClear: (id: string) => request<void>(`/api/session/${id}/revert`, { method: "DELETE" }),
 
+  exportSession: (id: string) => request<unknown>(`/api/experimental/session/${id}/export`, {}, 60_000),
+
   // --- forms (questions) & permissions -------------------------------------
   listSessionForms: (id: string) => request<FormInfo[]>(`/api/session/${id}/form`),
 
@@ -244,6 +248,13 @@ export const api = {
   // --- stats ----------------------------------------------------------------
   sessionStats: (params: { from?: string; to?: string; tools?: "none" | "summary" | "detail" } = {}) =>
     request<SessionStats>(`/api/experimental/session/stats${qs(params)}`, {}, 60_000),
+
+  // --- shell (remote command execution) ------------------------------------
+  runShellGlobal: (body: { command: string; cwd?: string; timeout?: number }, signal?: AbortSignal) =>
+    request<ShellInfo>("/api/shell", { method: "POST", body: JSON.stringify(body), signal }, 30_000),
+  shellInfo: (id: string, signal?: AbortSignal) => request<ShellInfo>(`/api/shell/${id}`, { signal }),
+  shellOutput: (id: string, signal?: AbortSignal) => request<ShellOutput>(`/api/shell/${id}/output`, { signal }),
+  killShell: (id: string) => request<void>(`/api/shell/${id}`, { method: "DELETE" }),
 
   // --- config ---------------------------------------------------------------
   getConfig: () => request<Record<string, unknown>>("/api/config"),

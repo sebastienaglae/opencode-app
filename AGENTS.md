@@ -87,6 +87,12 @@ service, then re-run the detection.
 | `npm run test` | Run bridge + app unit tests |
 | `npm run android:debug` | Build a debug APK |
 
+## Remote shell
+
+The composer supports `!command` (one-shot remote shell) and `/terminal` opens the console screen.
+Under the hood: `POST /api/shell { command, cwd }` then `GET /api/shell/{id}/output`. The bridge
+proxies these; the working directory defaults to the session's project.
+
 ## Do not
 
 - Do not edit or delete OpenCode's database, `service.json`, or config.

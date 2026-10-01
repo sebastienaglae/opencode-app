@@ -6,6 +6,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { arrowBackOutline, arrowDownOutline, ellipsisHorizontal, stopCircleOutline } from "ionicons/icons";
 import { api } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
+import { copyText } from "../core/clipboard";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
@@ -21,6 +24,7 @@ import { ContextRing } from "../components/ContextRing";
 import { ModelPicker } from "../components/ModelPicker";
 import { StatsBlock } from "../components/StatsBlock";
 import { DiffView } from "../components/DiffView";
+import { CodeBlock } from "../components/CodeBlock";
 import { Sheet, ActionSheet } from "../components/Sheet";
 
 export default function ConversationScreen() {
@@ -42,6 +46,8 @@ export default function ConversationScreen() {
   const [modelOpen, setModelOpen] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
   const [diffLimit, setDiffLimit] = useState(20);
+  const [shellResult, setShellResult] = useState<{ command: string; output: string; status: string; exit?: number | string } | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -182,6 +188,32 @@ export default function ConversationScreen() {
 
   const openModel = useCallback(() => setModelOpen(true), []);
 
+  const runShell = useCallback(
+    async (command: string) => {
+      if (!id) return;
+      setShellResult({ command, output: "", status: "running" });
+      try {
+        const created = await api.runShellGlobal({ command, cwd: session?.location?.directory });
+        if (!created) throw new Error("shell not created");
+        for (let i = 0; i < 900; i++) {
+          await new Promise((r) => setTimeout(r, 700));
+          const [info, out] = await Promise.all([
+            api.shellInfo(created.id).catch(() => undefined),
+            api.shellOutput(created.id).catch(() => undefined),
+          ]);
+          if (out) setShellResult((r) => (r ? { ...r, output: out.output } : r));
+          if (info && info.status !== "running") {
+            setShellResult((r) => (r ? { ...r, status: info.status, exit: info.exit } : r));
+            return;
+          }
+        }
+      } catch (err) {
+        setShellResult((r) => (r ? { ...r, status: "error", output: String(err) } : r));
+      }
+    },
+    [id, session?.location?.directory],
+  );
+
   const handleSend = async (text: string, files: PromptFileInput[]) => {
     const trimmed = text.trim();
     if (!id) return;
@@ -229,14 +261,38 @@ export default function ConversationScreen() {
         case "skills":
           navigate("/commands?tab=skills");
           return;
-        case "open":
         case "terminal":
         case "pty":
+        case "shell": {
+          const dir = session?.location?.directory ?? "";
+          navigate(`/console${dir ? `?cwd=${encodeURIComponent(dir)}` : ""}`);
+          return;
+        }
+        case "open":
+          navigate("/files");
+          return;
         case "connect":
-        case "share":
-        case "export":
+          navigate("/models");
+          return;
+        case "export": {
+          try {
+            const data = await api.exportSession(id);
+            const text = JSON.stringify(data, null, 2);
+            if (Capacitor.isNativePlatform()) await Share.share({ title: "OpenCode session", text });
+            else {
+              const ok = await copyText(text);
+              toast[ok ? "success" : "error"](ok ? t("toast.copied") : t("toast.copyFailed"));
+            }
+          } catch (err) {
+            toast.error(t("toast.error", { message: err instanceof Error ? err.message : String(err) }));
+          }
+          return;
+        }
         case "help":
-          window.alert(`/${name} : ${t("commands.notAvailable")}`);
+          setHelpOpen(true);
+          return;
+        case "share":
+          toast.show(`/${name} : ${t("commands.notAvailable")}`);
           return;
         default:
           break;
@@ -345,6 +401,7 @@ export default function ConversationScreen() {
         running={Boolean(conv?.running)}
         onSend={handleSend}
         onStop={() => void useSessions.getState().interrupt(id)}
+        onShell={runShell}
         modelLabel={modelLabel(session?.model, models)}
         agentLabel={session?.agent}
         onOpenModel={() => setModelOpen(true)}
@@ -366,6 +423,13 @@ export default function ConversationScreen() {
           {
             label: t("conv.menu.compact"),
             onClick: () => void api.compact(id).then(() => toast.success(t("toast.compacted"))).catch((e) => toast.error(t("toast.error", { message: String(e?.message ?? e) }))),
+          },
+          {
+            label: t("console.title"),
+            onClick: () => {
+              const dir = session?.location?.directory ?? "";
+              navigate(`/console${dir ? `?cwd=${encodeURIComponent(dir)}` : ""}`);
+            },
           },
           {
             label: t("conv.menu.diff"),
@@ -470,6 +534,45 @@ export default function ConversationScreen() {
             )}
           </div>
         )}
+      </Sheet>
+
+      <Sheet
+        open={shellResult !== null}
+        onClose={() => setShellResult(null)}
+        title={<span className="font-mono text-[13px]">$ {shellResult?.command ?? ""}</span>}
+      >
+        <div className="p-3">
+          {shellResult?.status === "running" && (
+            <div className="flex items-center gap-2 pb-2 text-[13px] text-muted">
+              <IonSpinner name="crescent" style={{ width: 14, height: 14 }} />
+              {t("console.running")}
+            </div>
+          )}
+          {shellResult?.output ? (
+            <CodeBlock code={shellResult.output} lang="text" plain />
+          ) : shellResult?.status === "running" ? null : (
+            <div className="p-6 text-center text-[13px] text-faint">—</div>
+          )}
+          {shellResult && shellResult.status !== "running" && (
+            <div className="pt-2 text-[12px] text-faint">
+              {shellResult.status === "exited" ? `${t("console.exit")} ${shellResult.exit ?? 0}` : shellResult.status}
+            </div>
+          )}
+        </div>
+      </Sheet>
+
+      <Sheet open={helpOpen} onClose={() => setHelpOpen(false)} title={t("cmd.help")}>
+        <div className="flex flex-col p-2">
+          {BUILTIN_COMMANDS.map((c) => (
+            <div key={c.name} className="flex items-baseline gap-3 px-3 py-2.5">
+              <span className="shrink-0 font-mono text-[13px] font-semibold text-accent">/{c.name}</span>
+              <span className="min-w-0 flex-1 text-[13px] text-muted">{t(c.descKey)}</span>
+            </div>
+          ))}
+          <div className="px-3 py-2.5 text-[12px] text-faint">
+            {t("conv.input.placeholder")} · <span className="font-mono">!command</span>
+          </div>
+        </div>
       </Sheet>
     </div>
   );

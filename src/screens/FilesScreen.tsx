@@ -6,6 +6,7 @@ import { api } from "../core/api/opencode";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
+import { useViewer } from "../core/navigation";
 import { CodeBlock } from "../components/CodeBlock";
 import { Sheet } from "../components/Sheet";
 import { basename } from "../core/format";
@@ -72,6 +73,15 @@ export default function FilesScreen() {
   }, [sessions, projects, directory]);
 
   useEffect(() => setStack([undefined]), [directory]);
+
+  const pendingFile = useViewer((s) => s.pendingFile);
+  const clearPending = useViewer((s) => s.clear);
+  useEffect(() => {
+    if (pendingFile) {
+      setOpenFile(pendingFile);
+      clearPending();
+    }
+  }, [pendingFile, clearPending]);
 
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ["fs", directory, current],

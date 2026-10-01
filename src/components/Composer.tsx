@@ -29,6 +29,7 @@ export function Composer({
   running,
   onSend,
   onStop,
+  onShell,
   modelLabel,
   agentLabel,
   onOpenModel,
@@ -37,6 +38,7 @@ export function Composer({
   running: boolean;
   onSend: (text: string, files: PromptFileInput[]) => Promise<void> | void;
   onStop: () => void;
+  onShell?: (command: string) => void;
   modelLabel?: string;
   agentLabel?: string;
   onOpenModel?: () => void;
@@ -122,7 +124,13 @@ export function Composer({
 
   const submit = async () => {
     const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || sending) return;
+    if (sending) return;
+    if (trimmed.startsWith("!") && trimmed.length > 1) {
+      onShell?.(trimmed.slice(1).trim());
+      setText("");
+      return;
+    }
+    if ((!trimmed && attachments.length === 0)) return;
     setSending(true);
     setError(null);
     try {

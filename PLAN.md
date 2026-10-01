@@ -485,3 +485,20 @@ Décisions prises suite au premier test sur téléphone :
 - Sélecteur de modèle mobile plus grand et recherchable ; sélecteur d'agent ; **agents en cours**
   affichés dans l'en-tête de conversation.
 
+---
+
+## 17. Troisième passe (v0.5) — exécution distante & finitions
+
+- **Exécution de commandes à distance** :
+  - `POST /api/shell { command, cwd }` → `Shell.Info`, puis `GET /api/shell/{id}/output` (polling)
+    pour la sortie, `GET /api/shell/{id}` pour le statut/exit, `DELETE /api/shell/{id}` pour tuer.
+  - Écran **Terminal** (`/console`) : historique commande → sortie, statut, exit code, durée, kill.
+  - Composer : préfixe **`!commande`** → exécution one-shot + résultat en feuille.
+- **Commandes câblées** : `/terminal`, `/pty`, `/shell` → console ; `/export` (share Android / copie) ;
+  `/open` → Fichiers ; `/connect` → Modèles ; `/help` → aide.
+- **Liens de fichiers dans les messages** : les chemins et `file://` deviennent cliquables
+  (Markdown `a` + code inline) et s'ouvrent dans la visionneuse, **cantonné au projet**.
+- **Nettoyage projets** : les « projets » sans session et sans VCS (disques, dossiers temp) sont masqués.
+- Correctif StrictMode : le flag d'annulation du polling était invalidé par le double-montage React.
+- Docs : README (section exécution distante), AGENTS.md, mockups sanitizés.
+

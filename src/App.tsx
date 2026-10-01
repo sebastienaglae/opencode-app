@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { IonApp, IonIcon } from "@ionic/react";
 import { App as CapacitorApp } from "@capacitor/app";
-import { HashRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { HashRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { chatbubblesOutline, cubeOutline, folderOutline, settingsOutline, terminalOutline } from "ionicons/icons";
 
 import { useConnection } from "./core/store/connection";
 import { useSettings } from "./core/store/settings";
 import { useNotifications } from "./hooks/useNotifications";
 import { useSessionWidget } from "./hooks/useSessionWidget";
+import { setNavigator } from "./core/navigation";
 import { useT } from "./core/i18n";
 import { Toaster } from "./components/Toaster";
 import ProjectsScreen from "./screens/ProjectsScreen";
@@ -16,12 +17,21 @@ import ConversationScreen from "./screens/ConversationScreen";
 import FilesScreen from "./screens/FilesScreen";
 import ModelsScreen from "./screens/ModelsScreen";
 import CommandsScreen from "./screens/CommandsScreen";
+import ConsoleScreen from "./screens/ConsoleScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+
+function RouterBridge() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    setNavigator((to) => navigate(to));
+  }, [navigate]);
+  return null;
+}
 
 function TabBar() {
   const t = useT();
   const { pathname } = useLocation();
-  if (pathname.startsWith("/session/")) return null;
+  if (pathname.startsWith("/session/") || pathname.startsWith("/console")) return null;
   const tabs = [
     { to: "/projects", label: t("projects.title"), icon: chatbubblesOutline },
     { to: "/files", label: t("tab.files"), icon: folderOutline },
@@ -65,6 +75,7 @@ export default function App() {
   return (
     <IonApp>
       <HashRouter>
+        <RouterBridge />
         <div className="flex h-full flex-col bg-bg text-fg">
           <Toaster />
           <div className="relative min-h-0 flex-1">
@@ -77,6 +88,7 @@ export default function App() {
               <Route path="/files" element={<FilesScreen />} />
               <Route path="/models" element={<ModelsScreen />} />
               <Route path="/commands" element={<CommandsScreen />} />
+              <Route path="/console" element={<ConsoleScreen />} />
               <Route path="/settings" element={<SettingsScreen />} />
               <Route path="*" element={<Navigate to="/projects" replace />} />
             </Routes>

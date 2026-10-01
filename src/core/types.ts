@@ -188,6 +188,21 @@ export type SkillInfo = { id: string; name: string; description?: string; autoin
 
 export type ServerInfo = { version: string; pid: number; urls: string[]; paths: { tmp: string } };
 
+export type ShellInfo = {
+  id: string;
+  status: "running" | "exited" | "timeout" | "killed";
+  command: string;
+  cwd: string;
+  shell: string;
+  file: string;
+  pid: number;
+  exit?: number | string;
+  metadata?: Record<string, unknown>;
+  time: { started: number; completed?: number };
+};
+
+export type ShellOutput = { output: string; cursor: number; size: number; truncated: boolean };
+
 export type Project = {
   id: string;
   canonical: string;

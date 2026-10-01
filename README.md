@@ -47,6 +47,15 @@ Android app ──HTTP + WebSocket──► companion bridge (Node) ──localh
 **Files**
 - Project-scoped file browser with **image preview** and text/code viewer.
 - Access is **restricted to OpenCode project roots** (enforced by the bridge, not just the UI).
+- **File links inside messages are clickable** (paths / `file://` URLs) and open in the viewer.
+
+**Remote execution**
+- **Terminal console** (`/console`): run **shell commands remotely** in the project directory and
+  see the output, exit code and duration (via `POST /api/shell` + output polling).
+- In the composer, prefix a message with **`!command`** to run a one-shot shell command and see the
+  result inline.
+- Commands `/terminal`, `/pty`, `/shell` open the console; `/export` exports the session (share on
+  Android, copy on web); `/open` opens Files; `/connect` opens Models; `/help` lists commands.
 
 **Experience**
 - **Dark + light**, OpenCode-like, **Tailwind CSS v4** + **Motion** animations.
