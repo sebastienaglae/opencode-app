@@ -58,6 +58,7 @@ export default function ProjectsScreen() {
         count: sessions.length,
         active: sessions.some((s) => isActive(s.id)),
         updated: Math.max(p.time?.active ?? 0, ...sessions.map((s) => s.time.updated), 0),
+        git: p.vcs === "git",
       };
     });
     for (const [projectID, sessions] of byProject) {
@@ -69,9 +70,13 @@ export default function ProjectsScreen() {
         count: sessions.length,
         active: sessions.some((s) => isActive(s.id)),
         updated: Math.max(...sessions.map((s) => s.time.updated), 0),
+        git: false,
       });
     }
-    return merged.sort((a, b) => Number(b.active) - Number(a.active) || b.updated - a.updated);
+    // Hide noise "projects" that are drives/temp dirs with no session and no VCS.
+    return merged
+      .filter((r) => r.count > 0 || r.git)
+      .sort((a, b) => Number(b.active) - Number(a.active) || b.updated - a.updated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, list, activeMap, conversations, t]);
 

@@ -81,15 +81,17 @@ export default function FilesScreen() {
   });
 
   const projectOptions = useMemo(() => {
+    const withSessions = new Set(sessions.map((s) => s.projectID));
     const seen = new Set<string>();
     const opts: Array<{ path: string; name: string }> = [];
     for (const p of projects) {
       if (!p.canonical || seen.has(p.canonical)) continue;
+      if (!withSessions.has(p.id) && p.vcs !== "git") continue;
       seen.add(p.canonical);
       opts.push({ path: p.canonical, name: p.name || basename(p.canonical) });
     }
     return opts.sort((a, b) => a.name.localeCompare(b.name));
-  }, [projects]);
+  }, [projects, sessions]);
 
   const isImage = openFile ? IMAGE_EXT.has(ext(openFile)) : false;
   const lang = openFile ? EXT_LANG[ext(openFile)] : undefined;
