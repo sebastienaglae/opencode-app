@@ -72,7 +72,7 @@ export function ModelPicker({
               {grouped.length === 0 && <div className="p-4 text-center text-[13px] text-muted">{t("models.empty")}</div>}
               {grouped.map(([provider, list]) => (
                 <div key={provider} className="mb-1">
-                  <div className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-faint">
+                  <div className="px-2 py-2 text-[12px] font-bold uppercase tracking-wide text-faint">
                     {providerLabel(provider)}
                   </div>
                   {list.map((m) =>
@@ -87,13 +87,13 @@ export function ModelPicker({
                             onClose();
                           }}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left",
+                            "flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left",
                             selected ? "bg-accentsoft" : "hover:bg-surface2",
                           )}
                         >
                           <span className="flex-1">
-                            <span className="text-[14px] text-fg">{m.name}</span>
-                            {variant && <span className="ml-1.5 text-[12px] text-accent">{variant}</span>}
+                            <span className="text-[15px] text-fg">{m.name}</span>
+                            {variant && <span className="ml-1.5 text-[13px] font-medium text-accent">{variant}</span>}
                           </span>
                           {selected && <IonIcon icon={checkmarkOutline} className="text-accent" />}
                         </button>

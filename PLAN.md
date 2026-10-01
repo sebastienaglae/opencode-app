@@ -442,3 +442,46 @@ Décisions prises suite au premier test sur téléphone :
 
 ### 15.6 Git
 - Dépôt initialisé et poussé sur `https://github.com/sebastienaglae/opencode-app` (branche `main`).
+
+---
+
+## 16. Deuxième passe (v0.3)
+
+### 16.1 Correctif critique : cascade CSS
+- Le CSS Ionic (`normalize.css`) contient un `button { padding:0; border-radius:0 }` **non-layeré**,
+  qui écrasait toutes les utilitaires Tailwind (les règles non-layerées gagnent sur les `@layer`).
+- Correctif : `src/theme/ionic.css` importe tout le CSS Ionic avec `layer(ionic)`, importé **avant**
+  `theme.css`. Ordre des layers : `ionic` < `theme` < `base` < `utilities` → Tailwind gagne.
+- C'était la cause de la plupart des problèmes visuels (« collé », une seule ligne, etc.).
+
+### 16.2 Couleur
+- Accent passé en **bleu** (`#5b9dff` dark / `#2563eb` light) pour coller à OpenCode.
+
+### 16.3 Conversation
+- **Prompts longs** : repliés sur ~6 lignes (`line-clamp-6`) avec « Afficher plus / Réduire » + copie.
+- **Réflexion + outils regroupés** en une seule ligne « N Modifier et Shell utilisés » (comme le
+  Desktop), dépliable ; chaque ligne outil affiche un **résumé** (commande, chemin, URL) et sa durée.
+- Réflexion : **Markdown** + durée ; outils : entrée/sortie/erreur, largeur pleine, espacement corrigé.
+- **Composer** : plus de scrollbar parasite, hauteur auto ; sélecteurs **Modèle** et **Agent** sous
+  l'input (à côté de + et caméra) ; autocomplétion en **overlay** (ne pousse plus la mise en page).
+- **Stats de fin** : une seule ligne discrète (messages, outils, tokens, coût, durée, tok/s).
+- Bouton « aller en bas » arrondi + animé ; scroll fluide.
+
+### 16.4 Commandes & MCP
+- **Toutes** les commandes intégrées listées (init, review, new, undo, compact, fork, export, open,
+  terminal, pty, mcp, model, connect, agents, skills, share, help) + commandes serveur.
+- Câblage : compact, new, fork, undo, model, agents, mcp, skills, init/review (serveur).
+- Nouvel onglet **MCP** (`GET /api/mcp`) et **Skills** ; vue plus lisible.
+
+### 16.5 Projets / Sessions / Fichiers
+- **Page Projets** dédiée (nom, chemin disque copiable, nombre de sessions, actif d'abord) →
+  **page Sessions du projet** (recherche, création dans le dossier du projet).
+- **Fichiers** : choix du **projet** à explorer, **aperçu des images** (`fsReadBlob` + objectURL),
+  lecture texte/coloration. Accès **cantonné au dossier du projet** sélectionné.
+
+### 16.6 Modèles & agents
+- Page Modèles enrichie : provider (OpenCode Go en premier), ctx/out, statut, tools/vision, famille,
+  coût $/M in/out, date de sortie, **toutes les variantes d'effort**.
+- Sélecteur de modèle mobile plus grand et recherchable ; sélecteur d'agent ; **agents en cours**
+  affichés dans l'en-tête de conversation.
+

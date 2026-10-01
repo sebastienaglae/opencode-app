@@ -8,7 +8,8 @@ import { useConnection } from "./core/store/connection";
 import { useSettings } from "./core/store/settings";
 import { useNotifications } from "./hooks/useNotifications";
 import { useT } from "./core/i18n";
-import SessionsScreen from "./screens/SessionsScreen";
+import ProjectsScreen from "./screens/ProjectsScreen";
+import ProjectSessionsScreen from "./screens/ProjectSessionsScreen";
 import ConversationScreen from "./screens/ConversationScreen";
 import FilesScreen from "./screens/FilesScreen";
 import ModelsScreen from "./screens/ModelsScreen";
@@ -20,7 +21,7 @@ function TabBar() {
   const { pathname } = useLocation();
   if (pathname.startsWith("/session/")) return null;
   const tabs = [
-    { to: "/sessions", label: t("tab.sessions"), icon: chatbubblesOutline },
+    { to: "/projects", label: t("projects.title"), icon: chatbubblesOutline },
     { to: "/files", label: t("tab.files"), icon: folderOutline },
     { to: "/models", label: t("tab.models"), icon: cubeOutline },
     { to: "/commands", label: t("tab.commands"), icon: terminalOutline },
@@ -64,14 +65,16 @@ export default function App() {
         <div className="flex h-full flex-col bg-bg text-fg">
           <div className="relative min-h-0 flex-1">
             <Routes>
-              <Route path="/" element={<Navigate to="/sessions" replace />} />
-              <Route path="/sessions" element={<SessionsScreen />} />
+              <Route path="/" element={<Navigate to="/projects" replace />} />
+              <Route path="/projects" element={<ProjectsScreen />} />
+              <Route path="/project/:id" element={<ProjectSessionsScreen />} />
+              <Route path="/sessions" element={<Navigate to="/projects" replace />} />
               <Route path="/session/:id" element={<ConversationScreen />} />
               <Route path="/files" element={<FilesScreen />} />
               <Route path="/models" element={<ModelsScreen />} />
               <Route path="/commands" element={<CommandsScreen />} />
               <Route path="/settings" element={<SettingsScreen />} />
-              <Route path="*" element={<Navigate to="/sessions" replace />} />
+              <Route path="*" element={<Navigate to="/projects" replace />} />
             </Routes>
           </div>
           <TabBar />

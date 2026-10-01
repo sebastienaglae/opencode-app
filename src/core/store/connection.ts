@@ -46,6 +46,8 @@ type ConnectionState = {
   disconnect: () => void;
 };
 
+let connectInFlight = false;
+
 export const useConnection = create<ConnectionState>((set) => ({
   status: "disconnected",
   eventStatus: "idle",
@@ -56,8 +58,11 @@ export const useConnection = create<ConnectionState>((set) => ({
   },
 
   connect: async () => {
-    const { host, port, token, candidatePorts } = useSettings.getState();
-    set({ status: "connecting", error: undefined });
+    if (connectInFlight) return false;
+    connectInFlight = true;
+    try {
+      const { host, port, token, candidatePorts } = useSettings.getState();
+      set({ status: "connecting", error: undefined });
 
     // Probe the configured port first; only fall back to the candidate list if
     // it does not answer.
@@ -81,7 +86,6 @@ export const useConnection = create<ConnectionState>((set) => ({
 
     if (found.port !== port) useSettings.getState().update({ port: found.port });
     eventStream.connect(host, found.port, token);
-    eventStream.onStatus((eventStatus) => set({ eventStatus }));
     set({ status: "connected", serverInfo: found.info, latency: found.latency, effectivePort: found.port });
     // Validate the API surface end-to-end (bridge proxy → OpenCode).
     try {
@@ -90,8 +94,13 @@ export const useConnection = create<ConnectionState>((set) => ({
       set({ error: err instanceof Error ? err.message : String(err) });
     }
     return true;
+    } finally {
+      connectInFlight = false;
+    }
   },
 }));
+
+eventStream.onStatus((eventStatus) => useConnection.setState({ eventStatus }));
 
 setReconnectHint(() => {
   const state = useConnection.getState();

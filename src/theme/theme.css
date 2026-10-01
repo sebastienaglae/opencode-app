@@ -13,8 +13,8 @@
   --oc-text: #17171a;
   --oc-muted: #6f6f78;
   --oc-faint: #a1a1aa;
-  --oc-accent: #d97706;
-  --oc-accent-soft: rgba(217, 119, 6, 0.12);
+  --oc-accent: #2563eb;
+  --oc-accent-soft: rgba(37, 99, 235, 0.1);
   --oc-success: #15803d;
   --oc-warn: #b45309;
   --oc-danger: #dc2626;
@@ -33,8 +33,8 @@
   --oc-text: #ededf0;
   --oc-muted: #9b9ba3;
   --oc-faint: #6b6b73;
-  --oc-accent: #f0a35e;
-  --oc-accent-soft: rgba(240, 163, 94, 0.14);
+  --oc-accent: #5b9dff;
+  --oc-accent-soft: rgba(91, 157, 255, 0.16);
   --oc-success: #4ade80;
   --oc-warn: #fbbf24;
   --oc-danger: #f87171;

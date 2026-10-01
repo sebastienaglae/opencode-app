@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { addOutline, cameraOutline, closeCircle, paperPlaneOutline, stopCircleOutline } from "ionicons/icons";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { api } from "../core/api/opencode";
+import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import type { PromptFileInput } from "../core/types";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
@@ -12,6 +13,7 @@ import { cn } from "../core/cn";
 export type Attachment = { name: string; mime: string; uri: string; size: number };
 
 const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_HEIGHT = 168;
 
 function fileToDataUrl(file: File): Promise<Attachment> {
   return new Promise((resolve, reject) => {
@@ -27,10 +29,18 @@ export function Composer({
   running,
   onSend,
   onStop,
+  modelLabel,
+  agentLabel,
+  onOpenModel,
+  onOpenAgent,
 }: {
   running: boolean;
   onSend: (text: string, files: PromptFileInput[]) => Promise<void> | void;
   onStop: () => void;
+  modelLabel?: string;
+  agentLabel?: string;
+  onOpenModel?: () => void;
+  onOpenAgent?: () => void;
 }) {
   const t = useT();
   const [text, setText] = useState("");
@@ -49,10 +59,14 @@ export function Composer({
     staleTime: 5 * 60_000,
   });
 
-  const allCommands = useMemo(
-    () => [{ name: "compact", description: t("conv.menu.compact") }, ...commands.filter((c) => c.name !== "compact")],
-    [commands, t],
-  );
+  const allCommands = useMemo(() => {
+    const builtins = BUILTIN_COMMANDS.map((b) => ({ name: b.name, description: t(b.descKey) }));
+    const known = new Set(builtins.map((b) => b.name));
+    const extra = commands
+      .filter((c) => !known.has(c.name))
+      .map((c) => ({ name: c.name, description: c.description ?? "" }));
+    return [...builtins, ...extra];
+  }, [commands, t]);
 
   const commandQuery = useMemo(() => {
     const trimmed = text.trimStart();
@@ -62,14 +76,16 @@ export function Composer({
 
   const suggestions = useMemo(() => {
     if (commandQuery === null) return [];
-    return allCommands.filter((c) => c.name.toLowerCase().includes(commandQuery)).slice(0, 12);
+    return allCommands.filter((c) => c.name.toLowerCase().includes(commandQuery)).slice(0, 20);
   }, [allCommands, commandQuery]);
 
   useEffect(() => {
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    const next = Math.min(el.scrollHeight, MAX_HEIGHT);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? "auto" : "hidden";
   }, [text]);
 
   const addFiles = async (files: FileList | null) => {
@@ -123,9 +139,9 @@ export function Composer({
   const canSend = (text.trim().length > 0 || attachments.length > 0) && !sending;
 
   return (
-    <div className="border-t border-border bg-bg px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2">
+    <div className="relative border-t border-border bg-bg px-3 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2">
       {suggestions.length > 0 && (
-        <div className="mb-2 max-h-56 overflow-y-auto oc-scroll rounded-xl border border-border bg-elevated shadow-lg">
+        <div className="absolute bottom-full left-3 right-3 z-20 mb-1 max-h-64 overflow-y-auto oc-scroll rounded-xl border border-border bg-elevated shadow-xl">
           {suggestions.map((c) => (
             <button
               key={c.name}
@@ -134,10 +150,10 @@ export function Composer({
                 setText(`/${c.name} `);
                 taRef.current?.focus();
               }}
-              className="flex w-full items-baseline gap-3 border-b border-border px-3 py-2 text-left last:border-b-0 active:bg-surface2"
+              className="flex w-full items-baseline gap-3 border-b border-border px-3 py-2.5 text-left last:border-b-0 active:bg-surface2"
             >
-              <span className="font-mono text-[13px] font-semibold text-accent">/{c.name}</span>
-              <span className="truncate text-[12px] text-muted">{c.description ?? ""}</span>
+              <span className="shrink-0 font-mono text-[14px] font-semibold text-accent">/{c.name}</span>
+              <span className="truncate text-[12.5px] text-muted">{c.description ?? ""}</span>
             </button>
           ))}
         </div>
@@ -147,7 +163,7 @@ export function Composer({
         <div className="mb-2 flex flex-wrap gap-1.5">
           {attachments.map((a, i) => (
             <span key={i} className="inline-flex max-w-[190px] items-center gap-1.5 rounded-lg border border-border bg-surface2 px-2 py-1 text-[12px]">
-              {a.mime.startsWith("image/") && <img src={a.uri} alt={a.name} className="h-6 w-6 rounded object-cover" />}
+              {a.mime.startsWith("image/") && <img src={a.uri} alt={a.name} className="h-7 w-7 rounded object-cover" />}
               <span className="truncate">{a.name}</span>
               <IonIcon
                 icon={closeCircle}
@@ -167,7 +183,7 @@ export function Composer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={t("conv.input.placeholder")}
-        className="block w-full resize-none rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-[15px] leading-relaxed text-fg outline-none transition-colors placeholder:text-faint focus:border-borderstrong"
+        className="block w-full resize-none overflow-hidden rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-[15px] leading-6 text-fg outline-none transition-colors placeholder:text-faint focus:border-borderstrong"
       />
 
       <div className="mt-1.5 flex items-center gap-0.5">
@@ -183,6 +199,24 @@ export function Composer({
         />
         <IconBtn onClick={() => fileInput.current?.click()} label={t("conv.attach")} icon={addOutline} />
         <IconBtn onClick={pickCamera} label={t("conv.camera")} icon={cameraOutline} />
+        {modelLabel !== undefined && (
+          <button
+            type="button"
+            onClick={onOpenModel}
+            className="ml-1 min-w-0 max-w-[42%] truncate rounded-full border border-border bg-surface2 px-3 py-1.5 text-[12.5px] font-medium text-fg active:bg-surface"
+          >
+            {modelLabel || t("conv.model")}
+          </button>
+        )}
+        {agentLabel !== undefined && (
+          <button
+            type="button"
+            onClick={onOpenAgent}
+            className="min-w-0 max-w-[26%] truncate rounded-full border border-border bg-surface2 px-3 py-1.5 text-[12.5px] font-medium text-muted active:bg-surface"
+          >
+            {agentLabel || t("conv.agent")}
+          </button>
+        )}
         <span className="flex-1" />
         {running && <IconBtn onClick={onStop} label={t("conv.stop")} icon={stopCircleOutline} className="text-danger" />}
         <button
@@ -191,7 +225,7 @@ export function Composer({
           onClick={submit}
           aria-label={t("conv.send")}
           className={cn(
-            "inline-flex h-10 w-10 items-center justify-center rounded-full text-[22px] transition-colors",
+            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] transition-colors",
             canSend ? "text-accent" : "text-faint opacity-50",
           )}
         >
@@ -208,7 +242,7 @@ function IconBtn({ icon, label, onClick, className }: { icon: string; label: str
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={cn("inline-flex h-10 w-10 items-center justify-center rounded-full text-[22px] text-muted active:bg-surface2", className)}
+      className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[22px] text-muted active:bg-surface2", className)}
     >
       <IonIcon icon={icon} />
     </button>

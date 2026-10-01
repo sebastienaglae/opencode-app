@@ -5,13 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { arrowBackOutline, arrowDownOutline, ellipsisHorizontal, stopCircleOutline } from "ionicons/icons";
 import { api } from "../core/api/opencode";
+import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { formatCost, formatDateTime, formatUsage } from "../core/format";
-import { modelLabel } from "../core/models";
-import type { ModelRef, PromptFileInput, SessionInfo } from "../core/types";
+import { modelLabel } from "../core/models";import type { ModelRef, PromptFileInput, SessionInfo } from "../core/types";
 import { MessageView } from "../components/MessageView";
 import { Composer } from "../components/Composer";
 import { QuestionBanner } from "../components/QuestionBanner";
@@ -38,6 +38,7 @@ export default function ConversationScreen() {
   const [contextOpen, setContextOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -51,6 +52,23 @@ export default function ConversationScreen() {
     enabled: status === "connected",
     staleTime: 5 * 60_000,
   });
+  const { data: agents = [] } = useQuery({
+    queryKey: ["agents"],
+    queryFn: api.listAgents,
+    enabled: status === "connected",
+    staleTime: 5 * 60_000,
+  });
+  const { data: activeMap = {} } = useQuery({
+    queryKey: ["active-sessions"],
+    queryFn: () => api.activeSessions(),
+    enabled: status === "connected",
+    refetchInterval: 6000,
+  });
+  const sessionList = useSessions((s) => s.list);
+  const runningAgents = useMemo(
+    () => sessionList.filter((s) => s.parentID === id && activeMap[s.id]),
+    [sessionList, id, activeMap],
+  );
   const { data: diff, isLoading: diffLoading } = useQuery({
     queryKey: ["diff", id],
     queryFn: () => api.sessionDiff(id!),
@@ -144,14 +162,66 @@ export default function ConversationScreen() {
   const handleSend = async (text: string, files: PromptFileInput[]) => {
     const trimmed = text.trim();
     if (!id) return;
-    if (trimmed === "/compact") {
-      await api.compact(id);
-      return;
-    }
     const match = /^\/([\w-]+)\s*([\s\S]*)$/.exec(trimmed);
-    if (match && commands.some((c) => c.name === match[1])) {
-      await api.runCommand(id, { name: match[1], text: match[2] });
-      return;
+    const name = match?.[1];
+    const rest = match?.[2] ?? "";
+    const isServerCommand = commands.some((c) => c.name === name) || BUILTIN_COMMANDS.some((b) => b.name === name && b.server);
+
+    if (name) {
+      switch (name) {
+        case "compact":
+          await api.compact(id);
+          return;
+        case "new": {
+          const s = await useSessions.getState().createSession({});
+          if (s) navigate(`/session/${s.id}`);
+          return;
+        }
+        case "fork": {
+          const s = await api.forkSession(id);
+          if (s) {
+            useSessions.getState().upsertSession(s);
+            navigate(`/session/${s.id}`);
+          }
+          return;
+        }
+        case "undo": {
+          const lastUser = [...messages].reverse().find((m) => m.type === "user");
+          if (lastUser) {
+            await api.revertStage(id, lastUser.id);
+            await api.revertCommit(id);
+            await useSessions.getState().loadMessages(id);
+          }
+          return;
+        }
+        case "model":
+          setModelOpen(true);
+          return;
+        case "agents":
+          setAgentOpen(true);
+          return;
+        case "mcp":
+          navigate("/commands?tab=mcp");
+          return;
+        case "skills":
+          navigate("/commands?tab=skills");
+          return;
+        case "open":
+        case "terminal":
+        case "pty":
+        case "connect":
+        case "share":
+        case "export":
+        case "help":
+          window.alert(`/${name} : ${t("commands.notAvailable")}`);
+          return;
+        default:
+          break;
+      }
+      if (isServerCommand) {
+        await api.runCommand(id, { name: name!, text: rest });
+        return;
+      }
     }
     await useSessions.getState().sendPrompt(id, text, files, session?.agent);
   };
@@ -161,11 +231,14 @@ export default function ConversationScreen() {
   return (
     <div className="flex h-full flex-col bg-bg">
       <header className="flex items-center gap-1 border-b border-border px-2 pb-2 pt-[calc(8px+env(safe-area-inset-top))]">
-        <button type="button" onClick={() => navigate("/sessions")} className="p-2 text-muted active:text-fg" aria-label={t("common.back")}>
+        <button type="button" onClick={() => navigate(-1)} className="p-2 text-muted active:text-fg" aria-label={t("common.back")}>
           <IonIcon icon={arrowBackOutline} className="text-[20px]" />
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold text-fg">{session?.title || t("app.name")}</div>
+          {runningAgents.length > 0 && (
+            <div className="truncate text-[11px] text-accent">{t("conv.agents.running", { count: runningAgents.length })}</div>
+          )}
         </div>
         {conv?.running && (
           <button type="button" onClick={() => void useSessions.getState().interrupt(id)} className="p-2 text-danger" aria-label={t("conv.stop")}>
@@ -245,7 +318,15 @@ export default function ConversationScreen() {
         </AnimatePresence>
       </div>
 
-      <Composer running={Boolean(conv?.running)} onSend={handleSend} onStop={() => void useSessions.getState().interrupt(id)} />
+      <Composer
+        running={Boolean(conv?.running)}
+        onSend={handleSend}
+        onStop={() => void useSessions.getState().interrupt(id)}
+        modelLabel={modelLabel(session?.model, models)}
+        agentLabel={session?.agent}
+        onOpenModel={() => setModelOpen(true)}
+        onOpenAgent={() => setAgentOpen(true)}
+      />
 
       <ActionSheet
         open={menuOpen}
@@ -280,6 +361,30 @@ export default function ConversationScreen() {
         current={session?.model}
         onSelect={(model) => void useSessions.getState().setSessionModel(id, model)}
       />
+
+      <Sheet open={agentOpen} onClose={() => setAgentOpen(false)} title={t("conv.agent")}>
+        <div className="flex flex-col p-2">
+          {agents
+            .filter((a) => !a.hidden && a.mode !== "subagent")
+            .map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => {
+                  void useSessions.getState().setSessionAgent(id, a.id);
+                  setAgentOpen(false);
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-3 text-left active:bg-surface2",
+                  session?.agent === a.id && "bg-accentsoft",
+                )}
+              >
+                <div className="text-[15px] font-medium text-fg">{a.name}</div>
+                {a.description && <div className="mt-0.5 text-[12.5px] text-muted">{a.description}</div>}
+              </button>
+            ))}
+        </div>
+      </Sheet>
 
       <Sheet open={contextOpen} onClose={() => setContextOpen(false)} title={t("conv.context.title")}>
         <ContextDetails

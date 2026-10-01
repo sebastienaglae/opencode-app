@@ -206,6 +206,8 @@ export const api = {
   listAgents: () => request<AgentInfo[]>("/api/agent"),
   listCommands: () => request<CommandInfo[]>("/api/command"),
   listSkills: () => request<SkillInfo[]>("/api/skill"),
+  listMcp: (signal?: AbortSignal) =>
+    request<Array<{ name: string; status?: { status: string }; integrationID?: string }>>("/api/mcp", { signal }),
 
   // --- filesystem -----------------------------------------------------------
   fsList: (path?: string, directory?: string) => {
@@ -223,6 +225,15 @@ export const api = {
     const res = await rawFetch(`/api/fs/read/${encoded}${s ? `?${s}` : ""}`, {}, 30_000);
     if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
     return res.text();
+  },
+  fsReadBlob: async (path: string, directory?: string): Promise<Blob> => {
+    const params = new URLSearchParams();
+    if (directory) params.set("location[directory]", directory);
+    const encoded = path.split("/").map(encodeURIComponent).join("/");
+    const s = params.toString();
+    const res = await rawFetch(`/api/fs/read/${encoded}${s ? `?${s}` : ""}`, {}, 30_000);
+    if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
+    return res.blob();
   },
 
   // --- vcs ------------------------------------------------------------------

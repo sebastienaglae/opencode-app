@@ -18,6 +18,8 @@ function UserMessage({
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const long = message.text.length > 300 || message.text.split("\n").length > 6;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(message.text);
@@ -31,7 +33,19 @@ function UserMessage({
     <div className="mt-8 first:mt-0">
       <div className="mb-1.5 ml-0.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("conv.you")}</div>
       <div className="group relative rounded-2xl border border-border bg-surface px-4 py-3">
-        <div className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-fg">{message.text}</div>
+        <div
+          className={cn(
+            "whitespace-pre-wrap break-words text-[15px] leading-relaxed text-fg",
+            long && !expanded && "line-clamp-6",
+          )}
+        >
+          {message.text}
+        </div>
+        {long && (
+          <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1.5 text-[13px] font-medium text-accent">
+            {expanded ? t("conv.showLess") : t("conv.showMore")}
+          </button>
+        )}
         <button
           type="button"
           onClick={copy}

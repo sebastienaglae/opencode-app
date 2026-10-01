@@ -70,17 +70,33 @@ export default function ModelsScreen() {
                 <span className="text-[11px] text-faint">{list.length}</span>
               </div>
               {list.map((m) => (
-                <div key={`${m.providerID}/${m.modelID}`} className="px-4 py-2.5">
-                  <div className="text-[14px] text-fg">{m.name}</div>
-                  <div className="mt-0.5 font-mono text-[11px] text-faint">
+                <div key={`${m.providerID}/${m.modelID}`} className="border-b border-border px-4 py-3">
+                  <div className="text-[15px] text-fg">{m.name}</div>
+                  <div className="mt-0.5 font-mono text-[11.5px] text-faint">
                     {m.modelID} · ctx {formatTokens(m.limit.context)} · out {formatTokens(m.limit.output)}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     <Chip>{m.status}</Chip>
                     {m.capabilities.tools && <Chip>tools</Chip>}
                     {m.capabilities.input.includes("image") && <Chip>vision</Chip>}
-                    {m.variants?.length > 0 && <Chip accent>{m.variants.length} {t("models.effort")}</Chip>}
+                    {m.family && <Chip>{m.family}</Chip>}
+                    {m.cost[0] && (
+                      <Chip>
+                        ${m.cost[0].input}/M in · ${m.cost[0].output}/M out
+                      </Chip>
+                    )}
+                    {m.time.released > 0 && <Chip>{new Date(m.time.released).toLocaleDateString()}</Chip>}
                   </div>
+                  {m.variants?.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] uppercase tracking-wide text-faint">{t("models.effort")}</span>
+                      {m.variants.map((v) => (
+                        <Chip key={v.id} accent>
+                          {v.id}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </section>
