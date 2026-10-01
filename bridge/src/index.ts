@@ -37,11 +37,22 @@ async function main() {
     console.warn("[bridge] The bridge will still start and retry through the proxy.");
   }
 
+  // Allowed filesystem roots = OpenCode project directories (path scoping).
+  let roots: string[] = [];
+  try {
+    const projects = await client.get<Array<{ canonical?: string }>>("/api/project");
+    roots = (Array.isArray(projects) ? projects : [])
+      .map((p) => p.canonical)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+  } catch {
+    /* scope disabled if projects cannot be listed */
+  }
+
   let running: RunningBridge | undefined;
   let lastError: unknown;
   for (const port of config.ports) {
     try {
-      running = await startBridge(config, client, info, port);
+      running = await startBridge(config, client, info, port, roots);
       break;
     } catch (err) {
       lastError = err;
@@ -68,6 +79,7 @@ async function main() {
   lines.push(`  OpenCode service : ${client.baseUrl}${info ? `  (v${info.version})` : "  (unreachable)"}`);
   lines.push(`  Bridge listening : ${config.host}:${running.port}`);
   lines.push(`  Auth             : ${config.anonymous ? "anonymous (disabled)" : `Bearer ${config.token}`}`);
+  lines.push(`  Path scope       : ${config.allowAnyPath ? "ANY (unsafe)" : `${roots.length} project root(s)`}`);
   lines.push("");
   lines.push("  Enter one of these in the app (Settings):");
   lines.push(`    host: 127.0.0.1        port: ${running.port}   (same machine)`);

@@ -7,9 +7,10 @@ import type { AssistantPart, ReasoningPart, ShellMessage, TextPart as TextPartTy
 import { cn } from "../core/cn";
 import { useT } from "../core/i18n";
 import { formatDuration } from "../core/format";
-import { toolLabelKey, toolResultText, toolSummary } from "../core/tools";
+import { toolFields, toolLabelKey, toolResultText, toolSummary } from "../core/tools";
 import { Markdown } from "./Markdown";
 import { CodeBlock } from "./CodeBlock";
+import { DiffView } from "./DiffView";
 
 export function Collapsible({ open, children }: { open: boolean; children: ReactNode }) {
   return (
@@ -113,7 +114,7 @@ function ToolRow({ part }: { part: ToolPart }) {
   const summary = toolSummary(part);
   const output = toolResultText(part);
   const errorText = state.status === "error" ? state.error?.message ?? "" : "";
-  const inputText = state.status === "streaming" ? state.input || "…" : JSON.stringify(state.input ?? {}, null, 2);
+  const fields = toolFields(part);
   const statusColor =
     state.status === "completed" ? "bg-success" : state.status === "error" ? "bg-danger" : "bg-accent oc-pulse";
 
@@ -129,10 +130,22 @@ function ToolRow({ part }: { part: ToolPart }) {
       </button>
       <Collapsible open={open}>
         <div className="flex flex-col gap-3 pb-3 pl-6 pr-1 pt-1">
-          <div>
-            <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-faint">{t("tool.input")}</div>
-            <CodeBlock code={inputText} lang="json" plain />
-          </div>
+          {fields.map((f, i) => (
+            <div key={i}>
+              <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-faint">
+                {f.labelKey.startsWith("#") ? f.labelKey.slice(1) : t(f.labelKey)}
+              </div>
+              {f.kind === "diff" ? (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <DiffView patch={f.value} />
+                </div>
+              ) : f.lang && f.lang !== "text" ? (
+                <CodeBlock code={f.value} lang={f.lang} />
+              ) : (
+                <CodeBlock code={f.value} lang="text" plain />
+              )}
+            </div>
+          ))}
           {output && (
             <div>
               <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-faint">{t("tool.output")}</div>
@@ -144,6 +157,9 @@ function ToolRow({ part }: { part: ToolPart }) {
               <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-danger">{t("tool.errorLabel")}</div>
               <pre className="whitespace-pre-wrap break-words font-mono text-[12px] text-danger">{errorText}</pre>
             </div>
+          )}
+          {fields.length === 0 && !output && !errorText && state.status !== "streaming" && (
+            <div className="text-[12px] text-faint">—</div>
           )}
         </div>
       </Collapsible>

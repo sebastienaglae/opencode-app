@@ -1,5 +1,5 @@
 import { useT } from "../core/i18n";
-import { formatCost, formatDuration, formatTokens, formatUsage } from "../core/format";
+import { formatCost, formatDuration, formatTokens } from "../core/format";
 import type { TokenUsage } from "../core/types";
 
 /** Discrete one-line end-of-session summary (wraps if needed). */
@@ -23,10 +23,10 @@ export function StatsBlock({
   const parts = [
     `${messages} ${t("conv.stats.messages")}`,
     `${tools} ${t("conv.stats.tools")}`,
-    `${formatTokens(tokens.input)} in · ${formatTokens(out)} out · ${formatTokens(tokens.reasoning)} reason`,
+    `${t("usage.in")} ${formatTokens(tokens.input)} · ${t("usage.out")} ${formatTokens(out)} · ${t("usage.reason")} ${formatTokens(tokens.reasoning)}`,
     formatCost(cost),
     durationMs !== undefined ? formatDuration(durationMs) : undefined,
-    speed !== undefined ? `${speed} tok/s` : undefined,
+    speed !== undefined ? `${speed} ${t("conv.stats.speed")}` : undefined,
   ].filter(Boolean) as string[];
 
   return (
@@ -35,5 +35,3 @@ export function StatsBlock({
     </div>
   );
 }
-
-export { formatUsage };

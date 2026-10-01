@@ -66,10 +66,10 @@ export default function FilesScreen() {
 
   useEffect(() => {
     if (directory === undefined) {
-      const first = sessions.find((s) => s.location?.directory)?.location.directory;
+      const first = sessions.find((s) => s.location?.directory)?.location.directory ?? projects.find((p) => p.canonical)?.canonical;
       if (first) setDirectory(first);
     }
-  }, [sessions, directory]);
+  }, [sessions, projects, directory]);
 
   useEffect(() => setStack([undefined]), [directory]);
 

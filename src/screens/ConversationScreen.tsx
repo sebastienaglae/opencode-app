@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +11,9 @@ import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { formatCost, formatDateTime, formatUsage } from "../core/format";
-import { modelLabel } from "../core/models";import type { ModelRef, PromptFileInput, SessionInfo } from "../core/types";
+import { modelLabel } from "../core/models";
+import { toast } from "../core/store/toast";
+import { emptyTokens } from "../core/types";import type { ModelRef, PromptFileInput, SessionInfo } from "../core/types";
 import { MessageView } from "../components/MessageView";
 import { Composer } from "../components/Composer";
 import { QuestionBanner } from "../components/QuestionBanner";
@@ -39,6 +41,7 @@ export default function ConversationScreen() {
   const [diffOpen, setDiffOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
+  const [diffLimit, setDiffLimit] = useState(20);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -137,7 +140,6 @@ export default function ConversationScreen() {
     return info?.limit.context ?? 0;
   }, [models, session?.model]);
 
-  const tokens = conv?.tokens ?? session?.tokens;
   const lastAssistantTokens = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
@@ -145,19 +147,40 @@ export default function ConversationScreen() {
     }
     return undefined;
   }, [messages]);
+
+  const tokens = useMemo(() => {
+    const base = conv?.tokens ?? session?.tokens;
+    if (base && (base.input || base.output || base.reasoning)) return base;
+    const sum = emptyTokens();
+    for (const m of messages) {
+      if (m.type === "assistant" && m.tokens) {
+        sum.input += m.tokens.input;
+        sum.output += m.tokens.output;
+        sum.reasoning += m.tokens.reasoning;
+        sum.cache.read += m.tokens.cache.read;
+        sum.cache.write += m.tokens.cache.write;
+      }
+    }
+    return sum;
+  }, [conv?.tokens, session?.tokens, messages]);
+
   const contextUsed = lastAssistantTokens
     ? lastAssistantTokens.input + lastAssistantTokens.cache.read + lastAssistantTokens.cache.write
-    : 0;
+    : tokens.input + tokens.cache.read;
   const cost = conv?.cost ?? session?.cost ?? 0;
 
-  const modelForUserMessage = (index: number): ModelRef | undefined => {
-    for (let j = index + 1; j < messages.length; j++) {
-      const m = messages[j];
-      if (m.type === "assistant") return m.model ?? session?.model;
-      if (m.type === "user") break;
+  const userModelLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    let current: ModelRef | undefined = session?.model;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.type === "assistant" && m.model) current = m.model;
+      else if (m.type === "user") map.set(m.id, modelLabel(current, models));
     }
-    return session?.model;
-  };
+    return map;
+  }, [messages, models, session?.model]);
+
+  const openModel = useCallback(() => setModelOpen(true), []);
 
   const handleSend = async (text: string, files: PromptFileInput[]) => {
     const trimmed = text.trim();
@@ -267,14 +290,14 @@ export default function ConversationScreen() {
                 </div>
               )}
               <div className="flex flex-col">
-                {messages.map((message, i) => (
+                {messages.map((message) => (
                   <MessageView
                     key={message.id}
                     message={message}
                     parts={message.type === "assistant" ? conv?.parts[message.id] : undefined}
                     running={Boolean(conv?.running)}
-                    modelLabel={message.type === "user" ? modelLabel(modelForUserMessage(i), models) : undefined}
-                    onOpenModel={message.type === "user" ? () => setModelOpen(true) : undefined}
+                    modelLabel={message.type === "user" ? userModelLabels.get(message.id) : undefined}
+                    onOpenModel={message.type === "user" ? openModel : undefined}
                   />
                 ))}
               </div>
@@ -336,18 +359,34 @@ export default function ConversationScreen() {
             label: t("common.rename"),
             onClick: () => {
               const title = window.prompt(t("sessions.rename.prompt"), session?.title ?? "");
-              if (title != null && title.trim()) void useSessions.getState().renameSession(id, title.trim());
+              if (title != null && title.trim())
+                void useSessions.getState().renameSession(id, title.trim()).then(() => toast.success(t("toast.renamed")));
             },
           },
-          { label: t("conv.menu.compact"), onClick: () => void api.compact(id) },
-          { label: t("conv.menu.diff"), onClick: () => setDiffOpen(true) },
-          { label: t("conv.menu.fork"), onClick: () => void api.forkSession(id).then((s) => s && useSessions.getState().upsertSession(s)) },
+          {
+            label: t("conv.menu.compact"),
+            onClick: () => void api.compact(id).then(() => toast.success(t("toast.compacted"))).catch((e) => toast.error(t("toast.error", { message: String(e?.message ?? e) }))),
+          },
+          {
+            label: t("conv.menu.diff"),
+            onClick: () => {
+              setDiffLimit(20);
+              setDiffOpen(true);
+            },
+          },
+          {
+            label: t("conv.menu.fork"),
+            onClick: () => void api.forkSession(id).then((s) => s && useSessions.getState().upsertSession(s)),
+          },
           {
             label: t("conv.menu.delete"),
             destructive: true,
             onClick: () => {
               if (window.confirm(t("sessions.delete.confirm", { title: session?.title || "—" }))) {
-                void useSessions.getState().removeSession(id).then(() => navigate("/sessions"));
+                void useSessions.getState().removeSession(id).then(() => {
+                  toast.success(t("toast.deleted"));
+                  navigate("/projects");
+                });
               }
             },
           },
@@ -359,7 +398,10 @@ export default function ConversationScreen() {
         onClose={() => setModelOpen(false)}
         models={models}
         current={session?.model}
-        onSelect={(model) => void useSessions.getState().setSessionModel(id, model)}
+        onSelect={(model) => {
+          void useSessions.getState().setSessionModel(id, model);
+          toast.success(t("toast.modelChanged"));
+        }}
       />
 
       <Sheet open={agentOpen} onClose={() => setAgentOpen(false)} title={t("conv.agent")}>
@@ -372,6 +414,7 @@ export default function ConversationScreen() {
                 type="button"
                 onClick={() => {
                   void useSessions.getState().setSessionAgent(id, a.id);
+                  toast.success(t("toast.agentChanged"));
                   setAgentOpen(false);
                 }}
                 className={cn(
@@ -406,7 +449,7 @@ export default function ConversationScreen() {
           <div className="p-8 text-center text-[13px] text-muted">{t("conv.diff.empty")}</div>
         ) : (
           <div className="flex flex-col gap-3 p-3">
-            {diff.map((f) => (
+            {diff.slice(0, diffLimit).map((f) => (
               <div key={f.file} className="overflow-hidden rounded-xl border border-border">
                 <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                   <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-fg">{f.file}</span>
@@ -416,6 +459,15 @@ export default function ConversationScreen() {
                 <DiffView patch={f.patch} />
               </div>
             ))}
+            {diff.length > diffLimit && (
+              <button
+                type="button"
+                onClick={() => setDiffLimit((l) => l + 20)}
+                className="mx-auto rounded-lg border border-border px-4 py-2 text-[13px] font-medium text-accent"
+              >
+                {t("common.loadMore")} ({diff.length - diffLimit})
+              </button>
+            )}
           </div>
         )}
       </Sheet>
@@ -448,7 +500,7 @@ function ContextDetails({
     [t("conv.context.effort"), session?.model?.variant ?? "—"],
     [t("conv.context.agent"), session?.agent ?? "—"],
     [t("conv.context.messages"), String(messagesCount)],
-    [t("conv.context.tokens"), tokens ? formatUsage(tokens) : "—"],
+    [t("conv.context.tokens"), tokens ? formatUsage(tokens, t) : "—"],
     [t("conv.context.cost"), formatCost(cost)],
     [t("conv.context.created"), formatDateTime(session?.time?.created)],
     [t("conv.context.updated"), formatDateTime(session?.time?.updated)],

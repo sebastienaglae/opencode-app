@@ -7,7 +7,7 @@ import { api } from "../core/api/opencode";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
-import { providerLabel, sortProviders } from "../core/models";
+import { providerLabel, sortProviders, statusLabel, effortLabel } from "../core/models";
 import { formatTokens } from "../core/format";
 
 export default function ModelsScreen() {
@@ -73,16 +73,16 @@ export default function ModelsScreen() {
                 <div key={`${m.providerID}/${m.modelID}`} className="border-b border-border px-4 py-3">
                   <div className="text-[15px] text-fg">{m.name}</div>
                   <div className="mt-0.5 font-mono text-[11.5px] text-faint">
-                    {m.modelID} · ctx {formatTokens(m.limit.context)} · out {formatTokens(m.limit.output)}
+                    {m.modelID} · {t("metric.ctx")} {formatTokens(m.limit.context)} · {t("metric.out")} {formatTokens(m.limit.output)}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <Chip>{m.status}</Chip>
-                    {m.capabilities.tools && <Chip>tools</Chip>}
-                    {m.capabilities.input.includes("image") && <Chip>vision</Chip>}
+                    <Chip>{statusLabel(m.status, t)}</Chip>
+                    {m.capabilities.tools && <Chip>{t("cap.tools")}</Chip>}
+                    {m.capabilities.input.includes("image") && <Chip>{t("cap.vision")}</Chip>}
                     {m.family && <Chip>{m.family}</Chip>}
                     {m.cost[0] && (
                       <Chip>
-                        ${m.cost[0].input}/M in · ${m.cost[0].output}/M out
+                        ${m.cost[0].input}/M {t("usage.in")} · ${m.cost[0].output}/M {t("usage.out")}
                       </Chip>
                     )}
                     {m.time.released > 0 && <Chip>{new Date(m.time.released).toLocaleDateString()}</Chip>}
@@ -92,7 +92,7 @@ export default function ModelsScreen() {
                       <span className="text-[11px] uppercase tracking-wide text-faint">{t("models.effort")}</span>
                       {m.variants.map((v) => (
                         <Chip key={v.id} accent>
-                          {v.id}
+                          {effortLabel(v.id, t)}
                         </Chip>
                       ))}
                     </div>

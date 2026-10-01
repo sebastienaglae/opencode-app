@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { IonIcon } from "@ionic/react";
 import { checkmarkOutline, copyOutline } from "ionicons/icons";
 import type { AssistantMessage, AssistantPart, MessageInfo } from "../core/types";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
+import { copyText } from "../core/clipboard";
+import { toast } from "../core/store/toast";
 import { Mark } from "./Mark";
 import { AssistantParts, ShellRow } from "./parts";
 
@@ -21,12 +23,11 @@ function UserMessage({
   const [expanded, setExpanded] = useState(false);
   const long = message.text.length > 300 || message.text.split("\n").length > 6;
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(message.text);
+    const ok = await copyText(message.text);
+    toast[ok ? "success" : "error"](ok ? t("toast.copied") : t("toast.copyFailed"));
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* ignore */
     }
   };
   return (
@@ -87,7 +88,7 @@ function AssistantView({ message, parts, running }: { message: AssistantMessage;
   );
 }
 
-export function MessageView({
+export const MessageView = memo(function MessageView({
   message,
   parts,
   running,
@@ -117,4 +118,4 @@ export function MessageView({
     return <div className="mt-1 text-[12px] italic text-faint">{text}</div>;
   }
   return null;
-}
+});

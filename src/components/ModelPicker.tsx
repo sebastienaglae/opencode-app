@@ -4,7 +4,7 @@ import { IonIcon } from "@ionic/react";
 import { checkmarkOutline, searchOutline } from "ionicons/icons";
 import type { ModelInfo, ModelRef } from "../core/types";
 import { useT } from "../core/i18n";
-import { providerLabel, sortProviders } from "../core/models";
+import { providerLabel, sortProviders, effortLabel } from "../core/models";
 import { cn } from "../core/cn";
 
 export function ModelPicker({
@@ -93,7 +93,7 @@ export function ModelPicker({
                         >
                           <span className="flex-1">
                             <span className="text-[15px] text-fg">{m.name}</span>
-                            {variant && <span className="ml-1.5 text-[13px] font-medium text-accent">{variant}</span>}
+                            {variant && <span className="ml-1.5 text-[13px] font-medium text-accent">{effortLabel(variant, t)}</span>}
                           </span>
                           {selected && <IonIcon icon={checkmarkOutline} className="text-accent" />}
                         </button>

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { resolve, sep } from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { OpenCodeClient, type OpenCodeInfo } from "./opencode.ts";
 import type { BridgeConfig } from "./config.ts";
@@ -11,6 +12,35 @@ export type RunningBridge = {
 
 const ALLOW_HEADERS = "authorization, content-type, accept, x-requested-with";
 const ALLOW_METHODS = "GET, POST, PATCH, PUT, DELETE, OPTIONS";
+
+const norm = (p: string) => resolve(p).replace(/\\/g, "/").toLowerCase().replace(/\/+$/, "");
+
+/** Returns true when the requested filesystem path stays inside one of the
+ *  OpenCode project roots. */
+function isPathAllowed(pathname: string, url: URL, roots: string[]): boolean {
+  const isFsRoute = pathname.startsWith("/api/fs/") || pathname === "/api/experimental/fs/write";
+  if (!isFsRoute) return true;
+  if (roots.length === 0) return true; // cannot determine scope → don't break
+
+  let target: string | undefined;
+  if (pathname.startsWith("/api/fs/read/")) target = decodeURIComponent(pathname.slice("/api/fs/read/".length));
+  else target = url.searchParams.get("path") ?? undefined;
+
+  if (!target) {
+    // Defaults to the requested location directory, which the app sets to a project.
+    const loc = url.searchParams.get("location[directory]");
+    if (!loc) return true;
+    target = loc;
+  }
+
+  const base = url.searchParams.get("location[directory]") ?? roots[0];
+  const absolute = /^[a-zA-Z]:[\\/]/.test(target) || target.startsWith("/") ? target : resolve(base, target);
+  const normalized = norm(absolute);
+  return roots.some((root) => {
+    const r = norm(root);
+    return normalized === r || normalized.startsWith(r + "/") || normalized.startsWith(r + sep.toLowerCase());
+  });
+}
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -35,6 +65,7 @@ export function startBridge(
   client: OpenCodeClient,
   info: OpenCodeInfo | undefined,
   port: number,
+  roots: string[] = [],
 ): Promise<RunningBridge> {
   const startedAt = Date.now();
   let eventClients = 0;
@@ -82,6 +113,10 @@ export function startBridge(
         const token = tokenFrom(req, url);
         if (!config.anonymous && token !== config.token) {
           send(401, { error: "unauthorized" });
+          return;
+        }
+        if (!config.allowAnyPath && !isPathAllowed(url.pathname, url, roots)) {
+          send(403, { error: "forbidden", message: "path outside of allowed project roots" });
           return;
         }
         await proxy(req, res, client, url);
@@ -194,7 +229,9 @@ export function startBridge(
     server.once("error", reject);
     server.listen(port, config.host, () => {
       server.removeListener("error", reject);
-      resolve({ server, port, url: `http://${config.host}:${port}` });
+      const address = server.address();
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      resolve({ server, port: actualPort, url: `http://${config.host}:${actualPort}` });
     });
   });
 }

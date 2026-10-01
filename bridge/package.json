@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/index.ts",
     "dev": "node --watch src/index.ts",
+    "test": "node --test test/sse.test.mjs test/config.test.mjs test/server.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

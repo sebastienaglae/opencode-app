@@ -7,7 +7,9 @@ import { chatbubblesOutline, cubeOutline, folderOutline, settingsOutline, termin
 import { useConnection } from "./core/store/connection";
 import { useSettings } from "./core/store/settings";
 import { useNotifications } from "./hooks/useNotifications";
+import { useSessionWidget } from "./hooks/useSessionWidget";
 import { useT } from "./core/i18n";
+import { Toaster } from "./components/Toaster";
 import ProjectsScreen from "./screens/ProjectsScreen";
 import ProjectSessionsScreen from "./screens/ProjectSessionsScreen";
 import ConversationScreen from "./screens/ConversationScreen";
@@ -49,6 +51,7 @@ function TabBar() {
 
 export default function App() {
   useNotifications();
+  useSessionWidget();
   useEffect(() => {
     void useConnection.getState().connect();
     const sub = CapacitorApp.addListener("appStateChange", ({ isActive }) => {
@@ -63,6 +66,7 @@ export default function App() {
     <IonApp>
       <HashRouter>
         <div className="flex h-full flex-col bg-bg text-fg">
+          <Toaster />
           <div className="relative min-h-0 flex-1">
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />

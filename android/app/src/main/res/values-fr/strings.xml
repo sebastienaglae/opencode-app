@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="widget_description">État des sessions OpenCode</string>
+    <string name="widget_app">OpenCode</string>
+    <string name="widget_none">Aucune session</string>
+    <string name="widget_running_one">1 session en cours</string>
+    <string name="widget_running_many">%1$d sessions en cours</string>
+    <string name="widget_finished">%1$d terminée(s)</string>
+    <string name="widget_finished_only">%1$d session(s) terminée(s)</string>
+</resources>

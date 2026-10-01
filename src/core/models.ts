@@ -34,3 +34,19 @@ export function modelLabel(model: ModelRef | undefined, models: ModelInfo[]): st
   const base = `${providerLabel(model.providerID)} · ${name}`;
   return model.variant ? `${base} · ${model.variant}` : base;
 }
+
+type Translator = (key: string, vars?: Record<string, string | number>) => string;
+
+export function effortLabel(variant: string | undefined, t: Translator): string {
+  if (!variant) return "";
+  const key = `effort.${variant.toLowerCase().replace(/[^a-z]/g, "")}`;
+  const translated = t(key);
+  return translated === key ? variant : translated;
+}
+
+export function statusLabel(status: string | undefined, t: Translator): string {
+  if (!status) return "";
+  const key = `model.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+}

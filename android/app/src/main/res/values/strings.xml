@@ -4,4 +4,11 @@
     <string name="title_activity_main">OpenCode Remote</string>
     <string name="package_name">ai.opencode.remote</string>
     <string name="custom_url_scheme">ai.opencode.remote</string>
+    <string name="widget_description">OpenCode session status</string>
+    <string name="widget_app">OpenCode</string>
+    <string name="widget_none">No session</string>
+    <string name="widget_running_one">1 session running</string>
+    <string name="widget_running_many">%1$d sessions running</string>
+    <string name="widget_finished">%1$d finished</string>
+    <string name="widget_finished_only">%1$d session(s) finished</string>
 </resources>

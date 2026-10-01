@@ -75,6 +75,7 @@ export type BridgeConfig = {
   opencodeVersion?: string;
   corsOrigin: string;
   anonymous: boolean;
+  allowAnyPath: boolean;
   configFile: string;
 };
 
@@ -86,6 +87,7 @@ export type CliOptions = {
   password?: string;
   cors?: string;
   anonymous?: boolean;
+  allowAnyPath?: boolean;
   serviceFile?: string;
   configFile?: string;
 };
@@ -110,6 +112,7 @@ export function parseArgs(argv: string[]): CliOptions {
           .filter((p) => Number.isFinite(p) && p > 0);
         break;
       case "--anonymous": opts.anonymous = true; break;
+      case "--allow-any-path": opts.allowAnyPath = true; break;
       case "--help":
       case "-h":
         printHelp();
@@ -132,6 +135,7 @@ Options:
   --ports <a,b,c>       Candidate ports, tried in order
   --cors <origin>       Allowed CORS origin (default: *)
   --anonymous           Disable token authentication (LAN/dev only)
+  --allow-any-path      Allow filesystem access outside project roots (unsafe)
   --service-file <path> Explicit OpenCode service.json path
   --config-file <path>  Where to persist the generated token
   -h, --help            Show this help
@@ -167,6 +171,7 @@ export function loadConfig(opts: CliOptions): BridgeConfig {
     opencodeVersion: reg?.version,
     corsOrigin: opts.cors ?? "*",
     anonymous: opts.anonymous ?? false,
+    allowAnyPath: opts.allowAnyPath ?? false,
     configFile,
   };
 }

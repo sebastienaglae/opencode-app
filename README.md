@@ -1,201 +1,211 @@
 # OpenCode Remote
 
-Application **Android** (Ionic + Capacitor) pour piloter **OpenCode Desktop (GUI)** à
-distance — même via un VPN Freebox — avec **streaming temps réel** des réflexions, des
-outils, du texte, du coût et des tokens.
+**Android remote control for OpenCode Desktop** — see and drive the same sessions from your phone,
+over your LAN or a VPN (e.g. a Freebox VPN), with **real-time streaming** of reasoning, tools,
+text, cost and tokens.
 
-> OpenCode Desktop est un *frontend* du service d'arrière-plan partagé
-> (`opencode service`). L'app se connecte à **ce même service** : les sessions créées
-> sur le téléphone apparaissent dans le Desktop, et inversement.
+> OpenCode Desktop is a *frontend* of the shared OpenCode background service. OpenCode Remote
+> connects to **that same service** (through a small companion bridge), so the phone and the
+> Desktop see the exact same sessions. The bridge **never modifies OpenCode**.
+
+```
+Android app ──HTTP + WebSocket──► companion bridge (Node) ──localhost──► OpenCode service ◄── Desktop / TUI
+```
+
+<p align="center">
+  <img src="docs/screenshots/projects.svg" width="240" alt="Projects" />
+  <img src="docs/screenshots/conversation.svg" width="240" alt="Conversation" />
+  <img src="docs/screenshots/models.svg" width="240" alt="Models" />
+</p>
 
 ---
 
-## Architecture
+## Features
 
-```
-Téléphone Android (Ionic + Capacitor)
-        │  HTTP (REST) + WebSocket (événements/PTY)
-        │  sur le réseau LAN / VPN Freebox
-        ▼
-opencode-remote-bridge (Node)          ← écoute sur 0.0.0.0:<port>
-        │  localhost + Basic opencode:<password>
-        ▼
-Service partagé OpenCode  ◄──  OpenCode Desktop GUI / TUI
-```
+**Sessions**
+- **Projects page → project sessions page**: browse projects (name + disk path, copyable, active first)
+  then the sessions of a project (active first).
+- Create a session in a project folder, rename, fork, delete, search.
 
-Le bridge :
-- lit `~/.local/state/opencode/service.json` (URL + mot de passe du service partagé) ;
-- expose une API REST proxifiée (`/api/*`) + un flux d'événements WebSocket (`/events`) ;
-- ajoute un **token Bearer** dédié et gère le CORS ;
-- se lie au **premier port libre** parmi une liste de 10 ports obscurs.
+**Conversation**
+- Real-time streaming: **reasoning**, **tool calls**, text, status, cost and tokens.
+- **Reasoning + tools are grouped** in one collapsible line ("2 Edit and Shell used"), each row
+  showing a **mapped summary** (command, file path, URL) and its duration — never raw JSON.
+- Long user prompts are **collapsed to ~6 lines** (tap to expand, copy button).
+- Full **Markdown** + **syntax highlighting** (Shiki), **diffs** rendered per turn.
+- **Composer**: attach files/camera, `/` **command autocomplete** as an overlay, **model** and
+  **agent** selectors under the input.
+- **Questions & permissions** fully supported (forms + permission requests) with **local notifications**.
 
-Le service OpenCode **reste en localhost** : seul le bridge est exposé au VPN.
+**Context & models**
+- **Circular context progress** (based on the last step) → tap for full details (provider, model,
+  effort, agent, messages, tokens, cost, dates).
+- **Model picker** with search, grouped by provider (OpenCode Go first), model × **effort**.
+- Models page with context/output limits, cost, capabilities, family and **all effort variants**.
+- **Commands** (all built-ins + server commands), **Skills** and **MCP** servers.
+
+**Files**
+- Project-scoped file browser with **image preview** and text/code viewer.
+- Access is **restricted to OpenCode project roots** (enforced by the bridge, not just the UI).
+
+**Experience**
+- **Dark + light**, OpenCode-like, **Tailwind CSS v4** + **Motion** animations.
+- **Toast** notifications for every action, robust clipboard copy (works in the WebView).
+- **Full i18n (French + English)** — every user-facing string, plus localized dates/numbers.
+- **Performance**: only the latest messages load (older ones paginate on scroll-up), memoized
+  message rendering, abortable requests, chunked diff rendering.
+
+**Android**
+- **Local notifications**: permission prompts, questions, and a **"session finished"** alert.
+- **Home-screen widget**: "N sessions running", or for a single running session its **project name
+  and a live elapsed timer**; shows how many finished.
+- Cleartext LAN traffic, notification permission, and OpenCode launcher icon configured.
 
 ---
 
-## Prérequis
+## Quick start
 
-- **OpenCode Desktop** (ou TUI/CLI) lancé au moins une fois → il démarre le service partagé.
-- **Node.js ≥ 20** (testé sur Node 24) sur la machine OpenCode.
-- Pour l'app : Node.js + npm (dev), et **Android Studio** (ou SDK Android + JDK 21) pour l'APK.
+### 1. Requirements
+- **OpenCode Desktop** (or TUI/CLI) launched at least once, so the shared service is running.
+- **Node.js ≥ 20** on the machine running OpenCode.
+- For the APK: **Android Studio** (or Android SDK + JDK 21).
 
----
-
-## 1. Lancer le bridge
-
-Sur la machine qui fait tourner OpenCode Desktop :
-
-```powershell
-# Windows
-.\start-bridge.ps1
-```
+### 2. Clone & install
 ```bash
-# macOS / Linux
-./start-bridge.sh
-```
-
-Sortie typique :
-
-```
-  OpenCode service : http://127.0.0.1:49374  (v2.0.21)
-  Bridge listening : 0.0.0.0:47821
-  Auth             : Bearer pNjIVpiMJ5QTvJjvQgpDF6GzRdFPczs15KN8_SkFXBY
-
-  Enter one of these in the app (Settings):
-    host: 127.0.0.1        port: 47821
-    host: 192.168.1.133   port: 47821   (LAN / VPN)
-```
-
-Options :
-
-```bash
-node bridge/src/index.ts \
-  --host 0.0.0.0 \
-  --ports 47821,47311,48240,46901,49923,45177,48812,46355,49730,47688 \
-  --token <token-perso> \
-  --cors "*" \
-  # --server http://127.0.0.1:49374 --password <secret>   (si service.json introuvable)
-  # --anonymous                                            (dev LAN uniquement)
-```
-
-Le token est généré et persisté dans `~/.opencode-remote/config.json`.
-
----
-
-## 2. Configurer l'app
-
-Dans **Réglages** :
-
-| Champ | Valeur |
-|-------|--------|
-| Hôte | IP LAN/VPN de la machine (ex. `192.168.1.133`) |
-| Port principal | `47821` (ou celui affiché par le bridge) |
-| Ports de secours | les 10 ports (préremplis) |
-| Token | le token Bearer affiché par le bridge |
-
-Puis **Enregistrer & connecter**. L'app sonde le port principal puis bascule
-automatiquement sur les ports de secours si besoin. Un badge indique l'état
-(`connecté:47821 · flux ok`).
-
-> L'écran Réglages affiche aussi la version du service OpenCode, le pid et la latence.
-
----
-
-## 3. Développement & build Android
-
-```bash
+git clone https://github.com/sebastienaglae/opencode-app
+cd opencode-app
 npm install
+cd bridge && npm install && cd ..
+```
 
-# Dev web (dans un navigateur, pour itérer vite)
-npm run dev                 # http://localhost:5173
+### 3. Detect OpenCode (does not modify it)
+```bash
+npm run detect
+```
+Reads `service.json` (and the `opencode` binary on PATH) and prints the URL/version. If nothing is
+found, launch OpenCode Desktop once and re-run.
 
-# Build web + sync natif
+### 4. Start the bridge
+```bash
+npm run bridge        # or: ./start-bridge.ps1  /  ./start-bridge.sh
+```
+It prints the host, the port and a **Bearer token**:
+
+```
+OpenCode service : http://127.0.0.1:49374  (v2.x)
+Bridge listening : 0.0.0.0:47821
+Auth             : Bearer <token>
+Path scope       : 12 project root(s)
+```
+
+### 5. Run the app
+```bash
+npm run dev           # browser: http://localhost:5173
+# or build the Android app:
+npm run build && npx cap sync android && npx cap open android
+```
+
+In **Settings**, enter the host (LAN/VPN IP), the port, and the token, then **Save & connect**.
+The app probes the primary port and falls back to the candidate ports automatically.
+
+---
+
+## Companion bridge
+
+The bridge (`bridge/`) is a small Node/TypeScript server. It:
+- reads `~/.local/state/opencode/service.json` (`%USERPROFILE%\.local\state\...` or `$XDG_STATE_HOME`),
+- proxies the OpenCode HTTP API at the same paths (`/api/*`),
+- streams OpenCode events over **WebSocket** at `/events`,
+- requires `Authorization: Bearer <token>` (except `/health`),
+- **scopes `/api/fs/*` to OpenCode project roots**,
+- binds `0.0.0.0` on the first free port of a fixed obscure list.
+
+| Flag | Effect |
+|------|--------|
+| `--server <url>` / `--password <secret>` | Explicit OpenCode service (skip `service.json`) |
+| `--service-file <path>` | Explicit `service.json` |
+| `--token <token>` | Fixed bearer token (else generated & persisted in `~/.opencode-remote/config.json`) |
+| `--host <addr>` / `--ports a,b,c` | Bind address / candidate ports |
+| `--anonymous` | Disable auth (dev only) |
+| `--allow-any-path` | Disable filesystem scoping (unsafe) |
+
+The OpenCode service stays on **localhost**; only the bridge is exposed to the VPN.
+
+---
+
+## Android
+
+```bash
 npm run build
 npx cap sync android
-
-# Ouvrir dans Android Studio
-npx cap open android
-
-# APK debug (nécessite JDK + SDK Android configurés)
-npm run android:debug       # -> android/app/build/outputs/apk/debug/app-debug.apk
+npx cap open android          # then Run in Android Studio
+# or
+npm run android:debug         # -> android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Si `JAVA_HOME` / `ANDROID_HOME` ne sont pas définis, Android Studio suffit :
-ouvre le dossier `android/`, puis **Run**.
+Configured in the native project:
+- `INTERNET` + `POST_NOTIFICATIONS` permissions, `usesCleartextTraffic="true"`.
+- **Notification permission** is requested at runtime (Android 13+).
+- **Home-screen widget** (`SessionWidgetProvider`) updated from the app state.
+- Launcher icon generated from the OpenCode mark (`npm run icons`).
 
 ---
 
-## Fonctionnalités
+## Tests
 
-### Disponibles (P0→P2)
-- Connexion au bridge : découverte du port + token, reconnexion auto, état en direct.
-- **Sessions** : liste (recherche, tirer pour rafraîchir), création (titre + dossier),
-  renommage, suppression, fork, badges « en cours », coût/tokens.
-- **Conversation** : chargement de l'historique paginé, rendu Markdown + coloration
-  syntaxique (Shiki), **blocs Réflexion repliables**, **cartes d'outils** (entrée/sortie/
-  erreur/durée/statut), texte streaming.
-- **Streaming temps réel** via WebSocket : texte, raisonnement, appels/états d'outils,
-  statut (`idle|busy|retry`), coût & tokens live, resynchronisation à la reconnexion.
-- **Envoyer / Arrêter** un prompt ; upload d'images et de fichiers (appareil photo,
-  galerie, fichiers → `data:` URL, ≤ 20 Mo).
-- **Système de questions complet** : **Forms** (string/number/integer/boolean/multiselect/
-  external) + **Permissions** (`once`/`always`/`reject`), avec **notifications locales**.
-- **Commandes** : autocomplétion `/…` dans le composer + liste complète (commandes & skills).
-- **Modèles** : sélection du modèle, du **provider** et de l'**effort** (variant), choix de
-  l'agent.
-- **Contexte & coût** : provider/modèle, effort, agent, nombre de messages (vous/assistant),
-  tokens (in/out/reasoning/cache r/w), coût total, dates de création/activité.
-- **Modifications** : diff par tour (`/session/{id}/diff`) avec coloration add/del.
-- **Fichiers** : navigateur de dossier (`fs/list`) + visionneuse (`fs/read`).
-- Thème **dark** (défaut) et **light**, style épuré OpenCode.
-
-### Roadmap (P3→P8, voir `PLAN.md`)
-- Gestion avancée des providers/credentials, patch de config.
-- Shell de session + terminaux PTY interactifs.
-- Découverte mDNS, verrou biométrique, QR de pairing.
-- Optimisations de bundle (code-splitting de l'app).
+```bash
+npm run test          # app unit tests + bridge tests
+npm run test:app      # format + tools mapping (node --test)
+npm run test:bridge   # SSE parser, config, server auth/path scoping
+npm run lint
+```
 
 ---
 
-## Sécurité
+## Internationalization
 
-- Le trafic reste **dans le VPN Freebox** : rien n'est exposé sur Internet.
-- Le service OpenCode n'écoute **que sur localhost** ; seul le bridge est joignable.
-- Le bridge exige un **Bearer token** (sauf `--anonymous`) et journalise les erreurs.
-- `/health` est public (nécessaire à la découverte de port) et n'expose que la version/pid.
-- Le mot de passe Basic OpenCode ne quitte jamais la machine.
+All strings live in `src/core/i18n.ts` (`fr` + `en`). Dates/numbers use `Intl` via
+`src/core/format.ts`. To add a language: add a dictionary in `i18n.ts`, extend `LANGUAGES`,
+and add a `values-<lang>/strings.xml` for the Android widget.
 
 ---
 
-## Dépannage
+## Security
 
-| Symptôme | Piste |
-|----------|-------|
-| `No OpenCode service found` | Lance OpenCode Desktop une fois, ou passe `--server`/`--password`. |
-| L'app reste « hors ligne » | Vérifie l'IP, le port, le token ; teste `curl http://<ip>:47821/health`. |
-| `401` sur les appels `/api/*` | Token incorrect (Réglages). |
-| Erreurs CORS dans la console (dev) | Uniquement lors du sondage de ports morts ; sans impact. |
-| Pas d'APK | Installe JDK 21 + SDK Android, ou build via Android Studio. |
-
-Logs du bridge : sortie standard. Logs OpenCode : `~/.local/share/opencode/log/opencode.log`.
+- Traffic stays inside your VPN; nothing is exposed to the Internet.
+- The OpenCode service listens on localhost only; the bridge is the only exposed surface.
+- Bearer token auth; filesystem access restricted to project roots.
+- No secrets, tokens, IPs or personal paths are committed (docs use generic data).
 
 ---
 
-## Structure
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `No OpenCode service found` | Launch OpenCode Desktop once, or pass `--server` / `--password`. |
+| App stays offline | Check host/port/token; test `curl http://<ip>:47821/health`. |
+| `401` on `/api/*` | Wrong token (Settings). |
+| `403` on files | Path outside project roots (by design); use the project picker. |
+| No APK | Install JDK 21 + Android SDK, or build via Android Studio. |
+
+---
+
+## Layout
 
 ```
 opencode-app/
-├─ bridge/                 # compagnon Node/TS (REST proxy + WebSocket)
-│  └─ src/{index,config,opencode,server}.ts
-├─ src/                    # app Ionic React
-│  ├─ core/{api,store,events,format,notify,types}.ts
-│  ├─ components/          # MessageView, ToolCard, Composer, QuestionBanner, CodeBlock, DiffView
-│  ├─ screens/             # Sessions, Conversation, Files, Models, Commands, Settings
-│  └─ theme/theme.css
-├─ android/                # projet natif Capacitor
-├─ start-bridge.ps1 / .sh
-├─ PLAN.md                 # plan détaillé + mapping API
-└─ capacitor.config.ts
+├─ bridge/                 # companion bridge (Node/TS, no build step)
+│  ├─ src/{index,config,opencode,server,sse}.ts
+│  └─ test/
+├─ src/                    # Ionic React + Vite + Tailwind v4 + Motion
+│  ├─ core/                # api, stores, events, i18n, format, tools, clipboard, widget
+│  ├─ components/          # MessageView, parts, Composer, ModelPicker, Toaster, Sheet…
+│  ├─ screens/             # Projects, ProjectSessions, Conversation, Files, Models, Commands, Settings
+│  └─ theme/               # ionic.css (layered) + theme.css (Tailwind tokens)
+├─ android/                # Capacitor project (+ widget, notifications)
+├─ scripts/                # icons, OpenCode detection
+├─ docs/screenshots/       # sanitized mockups
+├─ AGENTS.md               # AI/agent setup guide
+└─ PLAN.md                 # architecture + API/event mapping
 ```
-
-API OpenCode utilisée : voir `PLAN.md` §5 (endpoints) et §6 (catalogue d'événements).

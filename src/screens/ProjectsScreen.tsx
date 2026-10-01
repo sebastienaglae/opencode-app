@@ -9,6 +9,8 @@ import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { basename, formatRelative } from "../core/format";
+import { copyText } from "../core/clipboard";
+import { toast } from "../core/store/toast";
 import { Mark } from "../components/Mark";
 import type { Project } from "../core/types";
 
@@ -73,7 +75,10 @@ export default function ProjectsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, list, activeMap, conversations, t]);
 
-  const copyPath = (path: string) => void navigator.clipboard.writeText(path).catch(() => {});
+  const copyPath = async (path: string) => {
+    const ok = await copyText(path);
+    toast[ok ? "success" : "error"](ok ? t("toast.copied") : t("toast.copyFailed"));
+  };
 
   return (
     <div className="flex h-full flex-col bg-bg">
@@ -98,37 +103,34 @@ export default function ProjectsScreen() {
           <div className="p-10 text-center text-[13px] text-muted">{t("projects.empty")}</div>
         ) : (
           rows.map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              onClick={() => navigate(`/project/${row.id}`)}
-              className="flex w-full items-center gap-3 border-b border-border px-4 py-3.5 text-left active:bg-surface2"
-            >
-              <IonIcon icon={folderOutline} className="text-[20px] text-muted" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  {row.active && <span className="h-1.5 w-1.5 rounded-full bg-success oc-pulse" />}
-                  <span className="truncate text-[15px] font-semibold text-fg">{row.name}</span>
+            <div key={row.id} className="flex items-center border-b border-border">
+              <button
+                type="button"
+                onClick={() => navigate(`/project/${row.id}`)}
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left active:bg-surface2"
+              >
+                <IonIcon icon={folderOutline} className="text-[20px] text-muted" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    {row.active && <span className="h-1.5 w-1.5 rounded-full bg-success oc-pulse" />}
+                    <span className="truncate text-[15px] font-semibold text-fg">{row.name}</span>
+                  </span>
+                  <span className="mt-0.5 block truncate font-mono text-[11.5px] text-faint">{row.path}</span>
+                  <span className="mt-0.5 block text-[11.5px] text-faint">
+                    {t("projects.sessions", { count: row.count })} · {formatRelative(row.updated)}
+                  </span>
                 </span>
-                <span className="mt-0.5 block truncate font-mono text-[11.5px] text-faint">{row.path}</span>
-                <span className="mt-0.5 block text-[11.5px] text-faint">
-                  {t("projects.sessions", { count: row.count })} · {formatRelative(row.updated)}
-                </span>
-              </span>
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyPath(row.path);
-                }}
+              </button>
+              <button
+                type="button"
+                onClick={() => void copyPath(row.path)}
                 className="p-2 text-faint active:text-fg"
                 aria-label={t("projects.copyPath")}
               >
                 <IonIcon icon={copyOutline} className="text-[16px]" />
-              </span>
-              <IonIcon icon={chevronForwardOutline} className="text-[16px] text-faint" />
-            </button>
+              </button>
+              <IonIcon icon={chevronForwardOutline} className="mr-3 text-[16px] text-faint" />
+            </div>
           ))
         )}
         <div className="h-16" />

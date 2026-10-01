@@ -3,9 +3,24 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 
 let permissionChecked = false;
 
+export async function ensureNotificationPermission(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display === "granted") {
+      permissionChecked = true;
+      return true;
+    }
+    const req = await LocalNotifications.requestPermissions();
+    permissionChecked = req.display === "granted";
+    return permissionChecked;
+  } catch {
+    return false;
+  }
+}
+
 export async function notify(title: string, body: string): Promise<void> {
   if (!Capacitor.isNativePlatform()) {
-    // Web fallback: only if the user already granted permission.
     try {
       if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body });
     } catch {
@@ -15,18 +30,11 @@ export async function notify(title: string, body: string): Promise<void> {
   }
   try {
     if (!permissionChecked) {
-      permissionChecked = true;
-      const perm = await LocalNotifications.checkPermissions();
-      if (perm.display !== "granted") await LocalNotifications.requestPermissions();
+      const granted = await ensureNotificationPermission();
+      if (!granted) return;
     }
     await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: Math.floor(Math.random() * 1_000_000),
-          title,
-          body,
-        },
-      ],
+      notifications: [{ id: Math.floor(Math.random() * 1_000_000), title, body }],
     });
   } catch {
     /* ignore */

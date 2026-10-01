@@ -81,3 +81,79 @@ export function toolResultText(part: ToolPart): string {
     .map((c) => ("text" in c && c.text ? c.text : c.type === "file" ? `[file] ${c.path ?? ""}` : ""))
     .join("\n");
 }
+
+export type ToolField = { labelKey: string; value: string; lang?: string; kind?: "code" | "text" | "diff" };
+
+function str(v: unknown): string {
+  if (v == null) return "";
+  return typeof v === "string" ? v : JSON.stringify(v);
+}
+
+function simpleDiff(oldStr: string, newStr: string): string {
+  const out: string[] = [];
+  if (oldStr) for (const l of oldStr.split("\n")) out.push(`-${l}`);
+  if (newStr) for (const l of newStr.split("\n")) out.push(`+${l}`);
+  return out.join("\n");
+}
+
+/** Readable, mapped fields for a tool call (avoids dumping raw JSON). */
+export function toolFields(part: ToolPart): ToolField[] {
+  const input = toolInputObject(part);
+  const name = (part.name ?? "").toLowerCase();
+  const get = (k: string) => str(input[k]);
+  const fields: ToolField[] = [];
+
+  switch (name) {
+    case "shell":
+    case "bash":
+      if (get("command")) fields.push({ labelKey: "tool.command", value: get("command"), lang: "shellscript" });
+      break;
+    case "read":
+      if (get("filePath")) fields.push({ labelKey: "tool.file", value: get("filePath"), lang: "text" });
+      break;
+    case "edit":
+      if (get("filePath")) fields.push({ labelKey: "tool.file", value: get("filePath"), lang: "text" });
+      if (get("oldString") || get("newString"))
+        fields.push({ labelKey: "tool.diff", value: simpleDiff(get("oldString"), get("newString")), kind: "diff" });
+      break;
+    case "write":
+      if (get("filePath")) fields.push({ labelKey: "tool.file", value: get("filePath"), lang: "text" });
+      if (get("content")) fields.push({ labelKey: "tool.content", value: get("content"), kind: "code" });
+      break;
+    case "webfetch":
+      if (get("url")) fields.push({ labelKey: "tool.url", value: get("url") });
+      break;
+    case "grep":
+    case "glob":
+      if (get("pattern")) fields.push({ labelKey: "tool.pattern", value: get("pattern") });
+      if (get("path")) fields.push({ labelKey: "tool.path", value: get("path") });
+      break;
+    case "list":
+      if (get("path")) fields.push({ labelKey: "tool.path", value: get("path") });
+      break;
+    case "task":
+      if (get("description")) fields.push({ labelKey: "tool.description", value: get("description") });
+      if (get("prompt")) fields.push({ labelKey: "tool.prompt", value: get("prompt"), kind: "text" });
+      break;
+    case "todowrite": {
+      const todos = input["todos"];
+      if (Array.isArray(todos))
+        fields.push({
+          labelKey: "tool.todo",
+          value: todos.map((td) => `[${(td as { status?: string })?.status ?? ""}] ${(td as { content?: string })?.content ?? ""}`).join("\n"),
+          kind: "text",
+        });
+      break;
+    }
+    default: {
+      for (const [k, v] of Object.entries(input)) {
+        if (typeof v === "string" && v.length > 0 && v.length < 4000) {
+          fields.push({ labelKey: `#${k}`, value: v, kind: v.length > 200 ? "code" : "text" });
+        } else if (typeof v === "number" || typeof v === "boolean") {
+          fields.push({ labelKey: `#${k}`, value: String(v) });
+        }
+      }
+    }
+  }
+  return fields;
+}

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ModelRef } from "../types";
 import type { Lang } from "../i18n";
+import { setFormatLocale } from "../format";
 
 export type ThemeMode = "dark" | "light" | "system";
 
@@ -67,6 +68,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
     set(patch);
     persist(get());
     if (patch.theme) applyTheme(patch.theme);
+    if (patch.lang) setFormatLocale(patch.lang);
     if (patch.host || patch.token) notifyReconnectNeeded();
   },
   hydrate: () => {
@@ -79,6 +81,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
     }
     set({ ...loaded, hydrated: true });
     applyTheme(loaded.theme);
+    setFormatLocale(loaded.lang);
     if (typeof window !== "undefined" && window.matchMedia) {
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(get().theme));
     }
