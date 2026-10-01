@@ -1,0 +1,82 @@
+import { useEffect } from "react";
+import { IonApp, IonIcon } from "@ionic/react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { HashRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { chatbubblesOutline, cubeOutline, folderOutline, settingsOutline, terminalOutline } from "ionicons/icons";
+
+import { useConnection } from "./core/store/connection";
+import { useSettings } from "./core/store/settings";
+import { useNotifications } from "./hooks/useNotifications";
+import { useT } from "./core/i18n";
+import SessionsScreen from "./screens/SessionsScreen";
+import ConversationScreen from "./screens/ConversationScreen";
+import FilesScreen from "./screens/FilesScreen";
+import ModelsScreen from "./screens/ModelsScreen";
+import CommandsScreen from "./screens/CommandsScreen";
+import SettingsScreen from "./screens/SettingsScreen";
+
+function TabBar() {
+  const t = useT();
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/session/")) return null;
+  const tabs = [
+    { to: "/sessions", label: t("tab.sessions"), icon: chatbubblesOutline },
+    { to: "/files", label: t("tab.files"), icon: folderOutline },
+    { to: "/models", label: t("tab.models"), icon: cubeOutline },
+    { to: "/commands", label: t("tab.commands"), icon: terminalOutline },
+    { to: "/settings", label: t("tab.settings"), icon: settingsOutline },
+  ];
+  return (
+    <nav className="flex border-t border-border bg-bg pb-[env(safe-area-inset-bottom)]">
+      {tabs.map((tab) => (
+        <NavLink
+          key={tab.to}
+          to={tab.to}
+          className={({ isActive }) =>
+            `flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10.5px] font-semibold transition-colors ${
+              isActive ? "text-accent" : "text-faint"
+            }`
+          }
+        >
+          <IonIcon icon={tab.icon} className="text-[21px]" />
+          <span>{tab.label}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+export default function App() {
+  useNotifications();
+  useEffect(() => {
+    void useConnection.getState().connect();
+    const sub = CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive && useSettings.getState().hydrated) void useConnection.getState().connect();
+    });
+    return () => {
+      void sub.then((handle) => handle.remove());
+    };
+  }, []);
+
+  return (
+    <IonApp>
+      <HashRouter>
+        <div className="flex h-full flex-col bg-bg text-fg">
+          <div className="relative min-h-0 flex-1">
+            <Routes>
+              <Route path="/" element={<Navigate to="/sessions" replace />} />
+              <Route path="/sessions" element={<SessionsScreen />} />
+              <Route path="/session/:id" element={<ConversationScreen />} />
+              <Route path="/files" element={<FilesScreen />} />
+              <Route path="/models" element={<ModelsScreen />} />
+              <Route path="/commands" element={<CommandsScreen />} />
+              <Route path="/settings" element={<SettingsScreen />} />
+              <Route path="*" element={<Navigate to="/sessions" replace />} />
+            </Routes>
+          </div>
+          <TabBar />
+        </div>
+      </HashRouter>
+    </IonApp>
+  );
+}

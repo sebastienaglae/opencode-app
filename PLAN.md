@@ -52,47 +52,66 @@ Notre app se connecte donc **à ce service partagé**, sans créer de serveur co
 ┌────────────────────────────┐        VPN Freebox / LAN
 │  Téléphone Android         │        (WireGuard / OpenVPN)
 │  Ionic + Capacitor         │
-│  ┌──────────────────────┐  │   HTTPS/HTTP + WS
+│  ┌──────────────────────┐  │   HTTP/WS
 │  │ UI OpenCode-like     │  │◄──────────────────────────┐
-│  │ SSE/WS client        │  │                           │
+│  │ SSE/WS client        │  │  (Basic ou Bearer)        │
 │  │ Store sessions       │  │                           │
 │  └──────────────────────┘  │                           │
 └────────────────────────────┘                           │
                                                          ▼
-                            ┌───────────────────────────────────────────┐
-                            │  Machine OpenCode (Windows/Mac/Linux)     │
-                            │                                           │
-                            │  Option A — DIRECT                        │
-                            │    opencode serve --hostname 0.0.0.0 \    │
-                            │      --port 47821                         │
-                            │    Basic auth: opencode:<password>        │
-                            │                                           │
-                            │  Option B — BRIDGE (recommandé)           │
-                            │    opencode-remote-bridge (Node/TS)       │
-                            │      • se connecte à OpenCode             │
-                            │      • expose REST + SSE + WS PTY         │
-                            │      • token Bearer + CORS + upload       │
-                            │      • bind 1er port libre parmi 10       │
-                            └───────────────────────────────────────────┘
+                       ┌──────────────────────────────────────────────────┐
+                       │  Machine OpenCode (Windows/Mac/Linux)             │
+                       │                                                  │
+                       │   OpenCode Desktop (GUI) ──┐                      │
+                       │   TUI / web ───────────────┤ (clients)            │
+                       │                            ▼                     │
+                       │   ┌──────────────────────────────────────────┐   │
+                       │   │ SERVICE PARTAGÉ (opencode service)        │   │
+                       │   │  sessions · config · providers · tools    │   │
+                       │   │  défaut: 127.0.0.1:<port>  Basic auth     │   │
+                       │   └──────────────────────────────────────────┘   │
+                       │            ▲                                     │
+                       │            │ localhost                           │
+                       │   Option A │ (exposer le service)                │
+                       │   ─────────┤                                     │
+                       │            │   Option B — BRIDGE (recommandé)     │
+                       │   ┌────────┴──────────────────────────────────┐  │
+                       │   │ opencode-remote-bridge (Node/TS)          │  │
+                       │   │  • lit service.json → parle au service    │  │
+                       │   │  • expose REST + SSE + WS (events + PTY)  │  │
+                       │   │  • token Bearer + CORS + upload fichiers  │  │
+                       │   │  • bind 0.0.0.0 sur 1er port libre / 10   │  │
+                       │   └───────────────────────────────────────────┘  │
+                       └──────────────────────────────────────────────────┘
 ```
 
-### Option A — Connexion directe
-Le téléphone parle directement à l'API OpenCode (`/api/*`).
-- ➕ Aucun process supplémentaire.
-- ➖ CORS + mixed-content à gérer côté WebView Android.
-- ➖ L'authentification SSE avec header `Authorization` est fragile depuis le WebView.
-- ➖ Le mot de passe Basic OpenCode doit être stocké sur le téléphone.
+### Option A — Exposer le service partagé
+```
+opencode service set hostname 0.0.0.0
+opencode service set port 47821
+opencode service set password "<secret-long>"
+opencode service set cors https://localhost    # origine WebView Capacitor
+opencode service start
+```
+Le téléphone parle directement à l'API `/api/*` du service partagé (Basic `opencode:<password>`).
+- ➕ Aucun process supplémentaire ; sessions Desktop/TUI/téléphone strictement identiques.
+- ➖ Le service devient joignable sur le LAN (le VPN encadre l'accès).
+- ➖ CORS + mixed-content à gérer côté WebView Android ; SSE avec header `Authorization` fragile.
+- ➖ Mot de passe stocké sur le téléphone.
 
 ### Option B — Bridge compagnon (recommandé)
-Un petit serveur Node/TS (`@opencode/client`) tourne à côté d'OpenCode.
-- ➕ **Streaming via WebSocket** → aucun souci CORS / mixed-content.
-- ➕ **Token Bearer dédié** (révocable) ; le mot de passe OpenCode reste sur la machine.
+Un petit serveur Node/TS (`@opencode/client`) tourne à côté, **sur la même machine**.
+- Lit `service.json` et se connecte au service partagé en **localhost**.
+- Expose une surface unique (REST + **WebSocket** pour les événements et le PTY).
+- ➕ **Streaming WS** → aucun souci CORS / mixed-content Android.
+- ➕ **Token Bearer dédié** (révocable) ; le mot de passe OpenCode ne quitte pas la machine.
+- ➕ Le service partagé **reste en localhost** (rien d'autre n'est exposé que le bridge).
 - ➕ **Port fallback** : bind sur le 1er port libre d'une liste de 10.
 - ➕ Upload de fichiers unifié, QR code de connexion, mDNS.
 - ➖ Un process à lancer (script fourni, `start-remote.ps1` / `.sh`).
 
-> Le plan couvre les deux, mais l'app est conçue contre une **couche d'abstraction**
-> `OpenCodeTransport` afin de basculer sans réécrire l'UI.
+> Le plan couvre les deux ; l'app est conçue contre une **couche d'abstraction**
+> `OpenCodeTransport` pour basculer sans réécrire l'UI.
 
 ---
 
@@ -368,4 +387,58 @@ opencode-app/
 - Transport WS mobile en arrière-plan : utiliser un foreground service pour ne pas couper.
 - Endpoints marqués « experimental » peuvent évoluer entre versions d'OpenCode.
 - Certaines routes `persistentPty/terminal` sont expérimentales → V1/V2.
-```
+
+---
+
+## 15. Refonte UI/UX (retour utilisateur, v0.2)
+
+Décisions prises suite au premier test sur téléphone :
+
+### 15.1 Stack
+- **Tailwind CSS v4** (`@tailwindcss/vite`) utilisé au maximum pour la mise en page et le style ;
+  les design tokens restent des variables CSS (`--oc-*`) mappées en couleurs Tailwind via `@theme inline`.
+- **Motion** (`motion/react`) pour les animations : ouverture/fermeture des blocs, sheets, bouton
+  « aller en bas », transitions.
+- **i18n** : dictionnaire `fr`/`en` (`src/core/i18n.ts`), **français par défaut**, sélecteur dans Réglages.
+  Toute l'interface est traduite.
+- Ionic conservé (`IonApp`, `IonIcon`, `IonSpinner`) + Capacitor ; le scroll est un conteneur natif
+  (`overflow-y-auto`, scrollbar masquée) pour un comportement mobile fiable.
+
+### 15.2 Navigation & sessions
+- Header d'app : **mark OpenCode + « OpenCode » + nombre de sessions** + pastille d'état discrète
+  (le port et le libellé « connecté » sont retirés du header).
+- **Groupement par projet** : d'abord les **projets**, puis les sessions du projet.
+  Projets et sessions **actifs en premier**, puis par activité décroissante.
+- Sous le nom d'une session : **pas de modèle, pas de coût** (déplacés dans le détail contexte).
+
+### 15.3 Conversation
+- **Message utilisateur** : bulle distincte avec marge supérieure, libellé « Vous », **copie**,
+  et **chip modèle** cliquable sous la bulle.
+- **Pas de répétition « Assistant / provider / modèle »** sur chaque message.
+- **Réflexion** : ligne **sans cadre** (chevron + « Réflexion » + animation shimmer pendant
+  l'exécution) ; dépliable **pendant et après** l'exécution.
+- **Outils** : **empilés** en une ligne « N appels d'outils » (chevron) → liste des outils ;
+  chaque outil se déplie (entrée/sortie/erreur/durée). Même style que la réflexion.
+- **Shell** : même style que la réflexion, libellé « Exécution », déplie commande + sortie.
+- **Fin de session** : bloc **stats** (messages, outils, tokens in/out/reasoning/cache, coût,
+  durée, vitesse tok/s).
+- **Modèle** : dropdown compact (sheet) avec **recherche**, groupé par provider,
+  **OpenCode Go en premier** puis OpenCode ; choix modèle × **effort (variant)**.
+- **Progress circulaire de contexte** sous les trois points : % du contexte utilisé
+  (basé sur le **dernier step**, pas le cumul) ; clic → détail complet
+  (id, dossier, provider, modèle, effort, agent, messages, tokens, coût, dates).
+- Menu : renommer, compacter, modifications (diff), fork, supprimer.
+- **Scroll robuste** : collé en bas sans saut visuel, bouton « aller en bas » si on remonte,
+  **pagination vers le haut** qui charge les messages plus anciens en préservant la position.
+
+### 15.4 Chargement & performance
+- On charge d'abord les **derniers messages** (`order=desc`, 50) puis on remonte par curseur.
+- **Annulation** des requêtes en vol (`AbortController`) au changement de session / démontage.
+- Fusion des derniers messages à l'idle pour réconcilier sans perdre l'historique chargé.
+
+### 15.5 Identité
+- **Icône d'application** générée depuis le mark OpenCode (anneau carré « O ») :
+  adaptive icon + legacy + round + favicon web (`scripts/gen-icons.mjs`, via `sharp`).
+
+### 15.6 Git
+- Dépôt initialisé et poussé sur `https://github.com/sebastienaglae/opencode-app` (branche `main`).

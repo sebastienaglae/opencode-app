@@ -1,0 +1,20 @@
+{
+  "name": "opencode-remote-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Companion bridge exposing the local OpenCode service to the OpenCode Remote Android app.",
+  "scripts": {
+    "start": "node src/index.ts",
+    "dev": "node --watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/ws": "^8.18.2",
+    "typescript": "~6.0.2"
+  }
+}

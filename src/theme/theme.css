@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --- Design tokens (OpenCode-like, épuré) ---------------------------------- */
+:root {
+  --oc-bg: #ffffff;
+  --oc-surface: #fafafa;
+  --oc-surface-2: #f4f4f5;
+  --oc-elevated: #ffffff;
+  --oc-border: #e6e6e9;
+  --oc-border-strong: #d2d2d8;
+  --oc-text: #17171a;
+  --oc-muted: #6f6f78;
+  --oc-faint: #a1a1aa;
+  --oc-accent: #d97706;
+  --oc-accent-soft: rgba(217, 119, 6, 0.12);
+  --oc-success: #15803d;
+  --oc-warn: #b45309;
+  --oc-danger: #dc2626;
+  --oc-info: #2563eb;
+  --oc-code-bg: #f6f8fa;
+  --oc-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+.dark {
+  --oc-bg: #0a0a0b;
+  --oc-surface: #141416;
+  --oc-surface-2: #1b1b1e;
+  --oc-elevated: #1d1d20;
+  --oc-border: #26262a;
+  --oc-border-strong: #3a3a40;
+  --oc-text: #ededf0;
+  --oc-muted: #9b9ba3;
+  --oc-faint: #6b6b73;
+  --oc-accent: #f0a35e;
+  --oc-accent-soft: rgba(240, 163, 94, 0.14);
+  --oc-success: #4ade80;
+  --oc-warn: #fbbf24;
+  --oc-danger: #f87171;
+  --oc-info: #60a5fa;
+  --oc-code-bg: #121214;
+}
+
+@theme inline {
+  --color-bg: var(--oc-bg);
+  --color-surface: var(--oc-surface);
+  --color-surface2: var(--oc-surface-2);
+  --color-elevated: var(--oc-elevated);
+  --color-border: var(--oc-border);
+  --color-borderstrong: var(--oc-border-strong);
+  --color-fg: var(--oc-text);
+  --color-muted: var(--oc-muted);
+  --color-faint: var(--oc-faint);
+  --color-accent: var(--oc-accent);
+  --color-accentsoft: var(--oc-accent-soft);
+  --color-success: var(--oc-success);
+  --color-warn: var(--oc-warn);
+  --color-danger: var(--oc-danger);
+  --color-info: var(--oc-info);
+  --color-codebg: var(--oc-code-bg);
+  --font-mono: var(--oc-mono);
+}
+
+/* --- Ionic variable mapping ------------------------------------------------ */
+:root,
+.dark {
+  --ion-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ion-background-color: var(--oc-bg);
+  --ion-text-color: var(--oc-text);
+  --ion-border-color: var(--oc-border);
+  --ion-toolbar-background: var(--oc-bg);
+  --ion-toolbar-color: var(--oc-text);
+  --ion-item-background: transparent;
+  --ion-card-background: var(--oc-surface);
+  --ion-color-primary: var(--oc-accent);
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: var(--oc-accent);
+  --ion-color-primary-tint: var(--oc-accent);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--oc-bg);
+  color: var(--oc-text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+ion-content {
+  --background: var(--oc-bg);
+}
+
+ion-content::part(scroll) {
+  scrollbar-width: none;
+}
+ion-content::part(scroll)::-webkit-scrollbar {
+  display: none;
+}
+
+ion-toolbar {
+  --background: var(--oc-bg);
+  --border-color: var(--oc-border);
+  --min-height: 50px;
+}
+ion-header {
+  box-shadow: none;
+}
+
+/* --- Scrollbars (mobile: hidden / subtle) ---------------------------------- */
+.oc-scroll {
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+}
+.oc-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* --- Markdown --------------------------------------------------------------- */
+.oc-md {
+  font-size: 14.5px;
+  line-height: 1.62;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.oc-md > :first-child { margin-top: 0; }
+.oc-md > :last-child { margin-bottom: 0; }
+.oc-md p { margin: 0.55em 0; }
+.oc-md h1, .oc-md h2, .oc-md h3, .oc-md h4 {
+  margin: 1.1em 0 0.5em;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.oc-md h1 { font-size: 1.35em; }
+.oc-md h2 { font-size: 1.2em; }
+.oc-md h3 { font-size: 1.06em; }
+.oc-md ul, .oc-md ol { margin: 0.5em 0; padding-left: 1.35em; }
+.oc-md ul { list-style: disc; }
+.oc-md ol { list-style: decimal; }
+.oc-md li { margin: 0.2em 0; }
+.oc-md blockquote {
+  margin: 0.6em 0;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--oc-border-strong);
+  color: var(--oc-muted);
+}
+.oc-md a { color: var(--oc-accent); text-decoration: none; }
+.oc-md hr { border: none; border-top: 1px solid var(--oc-border); margin: 1em 0; }
+.oc-md table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+  font-size: 13px;
+  display: block;
+  overflow-x: auto;
+}
+.oc-md th, .oc-md td { border: 1px solid var(--oc-border); padding: 6px 10px; text-align: left; }
+.oc-md th { background: var(--oc-surface-2); font-weight: 600; }
+.oc-md img { max-width: 100%; border-radius: 8px; }
+.oc-md :not(pre) > code {
+  font-family: var(--oc-mono);
+  font-size: 0.86em;
+  padding: 1.5px 5px;
+  border-radius: 5px;
+  background: var(--oc-surface-2);
+  border: 1px solid var(--oc-border);
+}
+
+/* --- Code ------------------------------------------------------------------- */
+.oc-code {
+  margin: 0.55em 0;
+  border: 1px solid var(--oc-border);
+  border-radius: 8px;
+  background: var(--oc-code-bg);
+  overflow: hidden;
+}
+.oc-code pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: var(--oc-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.oc-code .shiki { background: transparent !important; }
+
+/* --- Diff ------------------------------------------------------------------- */
+.oc-diff {
+  font-family: var(--oc-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+.oc-diff .add { background: rgba(74, 222, 128, 0.12); color: var(--oc-success); }
+.oc-diff .del { background: rgba(248, 113, 113, 0.12); color: var(--oc-danger); }
+.oc-diff .hunk { color: var(--oc-info); }
+
+/* --- Animations ------------------------------------------------------------- */
+@keyframes oc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.oc-pulse { animation: oc-pulse 1.2s ease-in-out infinite; }
+
+@keyframes oc-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.oc-shimmer {
+  background: linear-gradient(90deg, var(--oc-faint) 0%, var(--oc-text) 50%, var(--oc-faint) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: oc-shimmer 1.8s linear infinite;
+}
+
+.oc-typing::after {
+  content: "▍";
+  margin-left: 1px;
+  animation: oc-pulse 1s steps(2) infinite;
+  color: var(--oc-accent);
+}
