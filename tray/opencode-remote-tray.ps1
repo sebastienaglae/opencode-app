@@ -6,6 +6,8 @@
   Usage:  powershell -ExecutionPolicy Bypass -File .\tray\opencode-remote-tray.ps1
 #>
 
+param([switch]$Panel)
+
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -20,7 +22,7 @@ $Bg = [System.Drawing.Color]::FromArgb(10, 10, 11)
 $Surface = [System.Drawing.Color]::FromArgb(24, 24, 27)
 $Fg = [System.Drawing.Color]::FromArgb(237, 237, 240)
 $Muted = [System.Drawing.Color]::FromArgb(155, 155, 163)
-$Accent = [System.Drawing.Color]::FromArgb(91, 157, 255)
+$AccentColor = [System.Drawing.Color]::FromArgb(91, 157, 255)
 $White = [System.Drawing.Color]::White
 
 function Get-State {
@@ -48,15 +50,15 @@ function Stop-Bridge {
     Get-BridgeProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
-function New-Button($text, $accent) {
+function New-Button($text, $isAccent) {
     $b = New-Object System.Windows.Forms.Button
     $b.Text = $text
     $b.FlatStyle = 'Flat'
     $b.FlatAppearance.BorderSize = 0
     $b.Font = New-Object System.Drawing.Font('Segoe UI', 10)
     $b.Cursor = 'Hand'
-    if ($accent) {
-        $b.BackColor = $Accent
+    if ($isAccent) {
+        $b.BackColor = $AccentColor
         $b.ForeColor = $White
     } else {
         $b.BackColor = $Surface
@@ -95,7 +97,10 @@ function Show-Panel {
 
         if ($state.qr -and (Test-Path $state.qr)) {
             $pic = New-Object System.Windows.Forms.PictureBox
-            $pic.Image = [System.Drawing.Image]::FromFile($state.qr)
+            # Load from memory so the file is not locked (the bridge must be able to rewrite it).
+            $bytes = [System.IO.File]::ReadAllBytes($state.qr)
+            $ms = New-Object System.IO.MemoryStream(,$bytes)
+            $pic.Image = [System.Drawing.Image]::FromStream($ms)
             $pic.SizeMode = 'Zoom'
             $pic.BackColor = $Bg
             $pic.Location = New-Object System.Drawing.Point(16, 72)
@@ -160,6 +165,8 @@ function Show-Panel {
     [void]$form.ShowDialog()
     $form.Dispose()
 }
+
+if ($Panel) { Show-Panel; exit 0 }
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
 try {

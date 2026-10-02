@@ -117,13 +117,12 @@ async function main() {
   console.log(lines.join("\n"));
 
   if (pair) {
+    const dir = join(homedir(), ".opencode-remote");
+    mkdirSync(dir, { recursive: true });
+    const qrPath = join(dir, "qr.png");
+    const statePath = join(dir, "state.json");
+
     try {
-      const QRCode = (await import("qrcode")).default;
-      const dir = join(homedir(), ".opencode-remote");
-      mkdirSync(dir, { recursive: true });
-      const qrPath = join(dir, "qr.png");
-      await QRCode.toFile(qrPath, pair, { width: 512, margin: 2 });
-      const statePath = join(dir, "state.json");
       writeFileSync(
         statePath,
         JSON.stringify(
@@ -144,10 +143,17 @@ async function main() {
         ),
         "utf8",
       );
+      console.log(`  State    : ${statePath}`);
+    } catch (err) {
+      console.warn("[bridge] state write failed:", err instanceof Error ? err.message : err);
+    }
+
+    try {
+      const QRCode = (await import("qrcode")).default;
+      await QRCode.toFile(qrPath, pair, { width: 512, margin: 2 });
       const ascii = await QRCode.toString(pair, { type: "terminal", small: true });
       console.log(ascii);
-      console.log(`  QR image : ${qrPath}`);
-      console.log(`  State    : ${statePath}\n`);
+      console.log(`  QR image : ${qrPath}\n`);
     } catch (err) {
       console.warn("[bridge] QR generation failed:", err instanceof Error ? err.message : err);
     }
