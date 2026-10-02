@@ -1,6 +1,7 @@
 <#
-  OpenCode Remote — Windows tray helper (styled like the app).
+  OpenCode Remote - Windows tray helper (styled like the app).
   Tray icon -> panel with the QR code, connection info and settings.
+  ASCII-only labels to avoid PowerShell 5.1 encoding issues.
 
   Usage:  powershell -ExecutionPolicy Bypass -File .\tray\opencode-remote-tray.ps1
 #>
@@ -20,6 +21,7 @@ $Surface = [System.Drawing.Color]::FromArgb(24, 24, 27)
 $Fg = [System.Drawing.Color]::FromArgb(237, 237, 240)
 $Muted = [System.Drawing.Color]::FromArgb(155, 155, 163)
 $Accent = [System.Drawing.Color]::FromArgb(91, 157, 255)
+$White = [System.Drawing.Color]::White
 
 function Get-State {
     if (Test-Path $StateFile) {
@@ -51,10 +53,15 @@ function New-Button($text, $accent) {
     $b.Text = $text
     $b.FlatStyle = 'Flat'
     $b.FlatAppearance.BorderSize = 0
-    $b.BackColor = if ($accent) { $Accent } else { $Surface }
-    $b.ForeColor = if ($accent) { [System.Drawing.Color]::White } else { $Fg }
     $b.Font = New-Object System.Drawing.Font('Segoe UI', 10)
     $b.Cursor = 'Hand'
+    if ($accent) {
+        $b.BackColor = $Accent
+        $b.ForeColor = $White
+    } else {
+        $b.BackColor = $Surface
+        $b.ForeColor = $Fg
+    }
     return $b
 }
 
@@ -80,7 +87,7 @@ function Show-Panel {
 
     if ($state) {
         $info = New-Object System.Windows.Forms.Label
-        $info.Text = "Hôte : $($state.host)     Port : $($state.port)     TLS : $($state.tls)"
+        $info.Text = "Hote : $($state.host)     Port : $($state.port)     TLS : $($state.tls)"
         $info.ForeColor = $Muted
         $info.Location = New-Object System.Drawing.Point(16, 46)
         $info.Size = New-Object System.Drawing.Size(408, 20)
@@ -119,13 +126,13 @@ function Show-Panel {
         $copy.Add_Click({ [System.Windows.Forms.Clipboard]::SetText([string]$state.link) })
         $form.Controls.Add($copy)
 
-        $save = New-Button 'Enregistrer le token & redémarrer' $false
+        $save = New-Button 'Enregistrer le token & redemarrer' $false
         $save.Location = New-Object System.Drawing.Point(16, 484)
         $save.Size = New-Object System.Drawing.Size(408, 36)
         $save.Add_Click({
             Set-Content -Path $ConfigFile -Value (@{ token = $tokenBox.Text } | ConvertTo-Json -Compress) -Encoding ascii -NoNewline
             Stop-Bridge; Start-Bridge
-            [System.Windows.Forms.MessageBox]::Show('Bridge redémarré avec le nouveau token.')
+            [System.Windows.Forms.MessageBox]::Show('Bridge redemarre avec le nouveau token.')
         })
         $form.Controls.Add($save)
 
@@ -136,7 +143,7 @@ function Show-Panel {
         $form.Controls.Add($openQr)
     } else {
         $empty = New-Object System.Windows.Forms.Label
-        $empty.Text = "Aucun état trouvé.`nDémarrez le bridge puis rouvrez ce panneau."
+        $empty.Text = "Aucun etat trouve.`nDemarrez le bridge puis rouvrez ce panneau."
         $empty.ForeColor = $Muted
         $empty.TextAlign = 'MiddleCenter'
         $empty.Location = New-Object System.Drawing.Point(16, 72)
@@ -144,10 +151,10 @@ function Show-Panel {
         $form.Controls.Add($empty)
     }
 
-    $restart = New-Button 'Démarrer / redémarrer le bridge' $false
+    $restart = New-Button 'Demarrer / redemarrer le bridge' $false
     $restart.Location = New-Object System.Drawing.Point(16, 576)
     $restart.Size = New-Object System.Drawing.Size(408, 36)
-    $restart.Add_Click({ Stop-Bridge; Start-Bridge; [System.Windows.Forms.MessageBox]::Show('Bridge (re)démarré.') })
+    $restart.Add_Click({ Stop-Bridge; Start-Bridge; [System.Windows.Forms.MessageBox]::Show('Bridge (re)demarre.') })
     $form.Controls.Add($restart)
 
     [void]$form.ShowDialog()
@@ -170,18 +177,28 @@ $notify.Text = 'OpenCode Remote'
 $notify.Visible = $true
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$miPanel = $menu.Items.Add('QR code & paramètres…')
+$menu.RenderMode = 'Professional'
+$menu.BackColor = $Surface
+$menu.ForeColor = $Fg
+
+$miPanel = $menu.Items.Add('QR code & parametres...')
+$miPanel.ForeColor = $Fg
 $miPanel.Add_Click({ Show-Panel })
 $miCopy = $menu.Items.Add('Copier le lien')
+$miCopy.ForeColor = $Fg
 $miCopy.Add_Click({ $s = Get-State; if ($s) { [System.Windows.Forms.Clipboard]::SetText([string]$s.link) } })
-$miStart = $menu.Items.Add('Démarrer le bridge')
+$miStart = $menu.Items.Add('Demarrer le bridge')
+$miStart.ForeColor = $Fg
 $miStart.Add_Click({ Start-Bridge })
-$miStartTls = $menu.Items.Add('Démarrer le bridge (TLS)')
+$miStartTls = $menu.Items.Add('Demarrer le bridge (TLS)')
+$miStartTls.ForeColor = $Fg
 $miStartTls.Add_Click({ Start-Bridge -Tls })
-$miStop = $menu.Items.Add('Arrêter le bridge')
+$miStop = $menu.Items.Add('Arreter le bridge')
+$miStop.ForeColor = $Fg
 $miStop.Add_Click({ Stop-Bridge })
 [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 $miQuit = $menu.Items.Add('Quitter')
+$miQuit.ForeColor = $Fg
 $miQuit.Add_Click({ $notify.Visible = $false; [System.Windows.Forms.Application]::Exit() })
 
 $notify.ContextMenuStrip = $menu
