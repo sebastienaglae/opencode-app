@@ -1,7 +1,11 @@
 import { networkInterfaces } from "node:os";
+import { homedir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { OpenCodeClient, type OpenCodeInfo } from "./opencode.ts";
 import { loadConfig, parseArgs } from "./config.ts";
 import { startBridge, type RunningBridge } from "./server.ts";
+import { ensureTls } from "./tls.ts";
 
 function localAddresses(): string[] {
   const out: string[] = [];
@@ -50,9 +54,18 @@ async function main() {
 
   let running: RunningBridge | undefined;
   let lastError: unknown;
+  let tls: Awaited<ReturnType<typeof ensureTls>> | undefined;
+  if (config.tls) {
+    try {
+      tls = await ensureTls(config.cert, config.key);
+    } catch (err) {
+      console.error("[bridge] Failed to prepare TLS:", err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  }
   for (const port of config.ports) {
     try {
-      running = await startBridge(config, client, info, port, roots);
+      running = await startBridge(config, client, info, port, roots, tls);
       break;
     } catch (err) {
       lastError = err;
@@ -80,6 +93,7 @@ async function main() {
   const scheme = config.tls ? "https" : "http";
   lines.push(`  Bridge listening : ${scheme}://${config.host}:${running.port}`);
   lines.push(`  Auth             : ${config.anonymous ? "anonymous (disabled)" : `Bearer ${config.token}`}`);
+  if (tls?.fingerprint) lines.push(`  TLS fingerprint  : ${tls.fingerprint}`);
   lines.push(`  Path scope       : ${config.allowAnyPath ? "ANY (unsafe)" : `${roots.length} project root(s)`}`);
   lines.push("");
   lines.push("  Enter one of these in the app (Settings):");
@@ -90,14 +104,54 @@ async function main() {
   lines.push("");
   lines.push(`  Event stream: ${config.tls ? "wss" : "ws"}://<host>:` + running.port + "/events?token=<token>");
   lines.push("");
-  if (!config.anonymous && addrs[0]) {
-    const pair = `ai.opencode.remote://connect?host=${addrs[0]}&port=${running.port}&token=${config.token}${config.tls ? "&secure=1" : ""}`;
-    lines.push("  Pairing link (Android app):");
+  const pair =
+    !config.anonymous && addrs[0]
+      ? `ai.opencode.remote://connect?host=${addrs[0]}&port=${running.port}&token=${config.token}${config.tls ? "&secure=1" : ""}`
+      : undefined;
+  if (pair) {
+    lines.push("  Pairing link (Android/iOS app):");
     lines.push(`    ${pair}`);
     lines.push("    adb shell \"am start -a android.intent.action.VIEW -d '" + pair + "'\"");
     lines.push("");
   }
   console.log(lines.join("\n"));
+
+  if (pair) {
+    try {
+      const QRCode = (await import("qrcode")).default;
+      const dir = join(homedir(), ".opencode-remote");
+      mkdirSync(dir, { recursive: true });
+      const qrPath = join(dir, "qr.png");
+      await QRCode.toFile(qrPath, pair, { width: 512, margin: 2 });
+      const statePath = join(dir, "state.json");
+      writeFileSync(
+        statePath,
+        JSON.stringify(
+          {
+            host: addrs[0],
+            hosts: addrs,
+            port: running.port,
+            token: config.token,
+            link: pair,
+            qr: qrPath,
+            tls: config.tls,
+            fingerprint: tls?.fingerprint ?? null,
+            version: info?.version ?? null,
+            updated: Date.now(),
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      const ascii = await QRCode.toString(pair, { type: "terminal", small: true });
+      console.log(ascii);
+      console.log(`  QR image : ${qrPath}`);
+      console.log(`  State    : ${statePath}\n`);
+    } catch (err) {
+      console.warn("[bridge] QR generation failed:", err instanceof Error ? err.message : err);
+    }
+  }
 
   const shutdown = () => {
     console.log("\n[bridge] Shutting down…");

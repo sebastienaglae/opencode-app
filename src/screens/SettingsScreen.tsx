@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { IonSpinner } from "@ionic/react";
+import { IonIcon, IonSpinner } from "@ionic/react";
+import { qrCodeOutline } from "ionicons/icons";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Camera } from "@capacitor/camera";
 import { useConnection } from "../core/store/connection";
@@ -7,6 +8,9 @@ import { DEFAULT_CANDIDATE_PORTS, useSettings, type ThemeMode } from "../core/st
 import { LANGUAGES, useT, type Lang } from "../core/i18n";
 import { cn } from "../core/cn";
 import { AppHeader } from "../components/AppHeader";
+import { scanQrFromCamera } from "../core/qrScan";
+import { applyPairingLink } from "../core/pairing";
+import { toast } from "../core/store/toast";
 
 function Field({
   label,
@@ -142,6 +146,27 @@ export default function SettingsScreen() {
     });
   };
 
+  const onScan = async () => {
+    try {
+      const code = await scanQrFromCamera();
+      if (!code) {
+        toast.error(t("scan.noCode"));
+        return;
+      }
+      if (applyPairingLink(code)) {
+        const s = useSettings.getState();
+        setHost(s.host);
+        setPort(String(s.port));
+        setToken(s.token);
+        toast.success(t("toast.paired"));
+      } else {
+        toast.error(t("scan.error"));
+      }
+    } catch {
+      toast.error(t("scan.error"));
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-bg">
       <AppHeader subtitle={t("settings.title")} />
@@ -168,6 +193,14 @@ export default function SettingsScreen() {
               {t("settings.disconnect")}
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => void onScan()}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-[14px] font-semibold text-fg"
+          >
+            <IonIcon icon={qrCodeOutline} className="text-[18px] text-accent" />
+            {t("settings.scanQr")}
+          </button>
         </section>
 
         <section className="border-t border-border py-3">

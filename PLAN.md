@@ -525,3 +525,31 @@ Décisions prises suite au premier test sur téléphone :
 - **iOS préparé** : plateforme Capacitor iOS + widget WidgetKit + plugin iOS (App Group) +
   `docs/ios.md`.
 
+---
+
+## 20. Sixième passe (v0.8) — QR, widget responsive, tray Windows
+
+- **Widget responsive** : `onAppWidgetOptionsChanged` + largeur → 0/3/6 lignes ; la liste des
+  sessions en cours est passée au widget (`sessions` JSON) et affichée quand il y a la place ;
+  chrono live pour une seule session. **Écran verrouillé** : `widgetCategory="home_screen|keyguard"`.
+  iOS : rendu par `widgetFamily` (small/medium/large).
+- **QR** : le bridge affiche un **QR ASCII**, écrit `qr.png` et `state.json`
+  (`~/.opencode-remote/`) ; l'app scanne un QR via la caméra + **jsQR** (`Settings → Scanner un QR`).
+- **Tray Windows** : `tray/opencode-remote-tray.ps1` (NotifyIcon) — panneau QR + réglages,
+  copier le lien, démarrer/arrêter le bridge.
+
+---
+
+## 19. Cinquième passe (v0.7) — prévisualisation & chiffrement local
+
+- **Prévisualisation in-app** : `GET /servers` (le bridge sonde les ports de dev courants sur
+  la machine) ; écran **Preview** avec iframe, barre de port, chips des serveurs détectés, et
+  **permission explicite** au premier usage (`previewAllowed`). Accessible depuis le menu de
+  conversation.
+- **TLS auto-signé** : `--tls` génère (ou réutilise) un certificat auto-signé
+  (`~/.opencode-remote/tls`), sert **HTTPS/WSS** et affiche l'empreinte. `--cert/--key` pour un
+  vrai certificat. Option « Connexion chiffrée » dans les Réglages.
+- **Android** : `network_security_config.xml` (cleartext + CAs système/utilisateur) et
+  `MainActivity` qui accepte le certificat auto-signé **uniquement pour les hôtes privés/LAN**.
+  Le VPN couvre l'extérieur ; le TLS couvre le Wi‑Fi local.
+

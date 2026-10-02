@@ -7,22 +7,33 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.View;
 import android.widget.RemoteViews;
 
-/** Home-screen widget showing the state of the OpenCode sessions. */
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+/** Home-screen / lock-screen widget showing OpenCode session status.
+ *  Responsive: shows a single session with a live timer when compact, and a
+ *  list of running sessions when there is room. */
 public class SessionWidgetProvider extends AppWidgetProvider {
 
     public static final String PREFS = "opencode_widget";
 
-    public static void save(Context context, int running, int finished, String project, long startedAt) {
+    public static void save(Context context, int running, int finished, String project, long startedAt, String sessions) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putInt("running", running)
             .putInt("finished", finished)
             .putString("project", project == null ? "" : project)
             .putLong("startedAt", startedAt)
+            .putString("sessions", sessions == null ? "[]" : sessions)
             .apply();
     }
 
@@ -40,30 +51,59 @@ public class SessionWidgetProvider extends AppWidgetProvider {
         int finished = prefs.getInt("finished", 0);
         String project = prefs.getString("project", "");
         long startedAt = prefs.getLong("startedAt", 0L);
+        String sessionsJson = prefs.getString("sessions", "[]");
+
+        Bundle options = manager.getAppWidgetOptions(id);
+        int minWidth = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 180) : 180;
+        int maxRows = minWidth < 180 ? 0 : minWidth < 280 ? 3 : 6;
 
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.session_widget);
         views.setViewVisibility(R.id.widget_chronometer, View.GONE);
+        views.removeAllViews(R.id.widget_rows);
 
-        if (running >= 2) {
-            views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_running_many, running));
-            views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_finished, finished));
-        } else if (running == 1) {
-            views.setTextViewText(
-                R.id.widget_title,
-                project == null || project.isEmpty() ? context.getString(R.string.widget_running_one) : project
-            );
-            views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_finished, finished));
-            views.setViewVisibility(R.id.widget_chronometer, View.VISIBLE);
-            if (startedAt > 0) {
-                long base = SystemClock.elapsedRealtime() - Math.max(0L, System.currentTimeMillis() - startedAt);
-                views.setChronometer(R.id.widget_chronometer, base, null, true);
-            }
-        } else {
+        if (running == 0) {
             views.setTextViewText(
                 R.id.widget_title,
                 finished > 0 ? context.getString(R.string.widget_finished_only, finished) : context.getString(R.string.widget_none)
             );
             views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_app));
+        } else if (maxRows == 0 || running == 1) {
+            views.setTextViewText(
+                R.id.widget_title,
+                running == 1
+                    ? (project.isEmpty() ? context.getString(R.string.widget_running_one) : project)
+                    : context.getString(R.string.widget_running_many, running)
+            );
+            if (running == 1 && startedAt > 0) {
+                long base = SystemClock.elapsedRealtime() - Math.max(0L, System.currentTimeMillis() - startedAt);
+                views.setChronometer(R.id.widget_chronometer, base, null, true);
+                views.setViewVisibility(R.id.widget_chronometer, View.VISIBLE);
+            }
+            views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_finished, finished));
+        } else {
+            views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_running_many, running));
+            SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            try {
+                JSONArray arr = new JSONArray(sessionsJson);
+                int shown = Math.min(arr.length(), maxRows);
+                for (int i = 0; i < shown; i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
+                    row.setTextViewText(R.id.row_project, o.optString("project", ""));
+                    long st = o.optLong("startedAt", 0L);
+                    row.setTextViewText(R.id.row_time, st > 0 ? fmt.format(new Date(st)) : "");
+                    views.addView(R.id.widget_rows, row);
+                }
+                if (arr.length() > shown) {
+                    RemoteViews more = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
+                    more.setTextViewText(R.id.row_project, "+" + (arr.length() - shown));
+                    more.setTextViewText(R.id.row_time, "");
+                    views.addView(R.id.widget_rows, more);
+                }
+            } catch (Exception ignored) {
+                /* malformed sessions */
+            }
+            views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_finished, finished));
         }
 
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
@@ -85,5 +125,10 @@ public class SessionWidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             update(context, manager, id);
         }
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int id, Bundle newOptions) {
+        update(context, manager, id);
     }
 }

@@ -30,8 +30,12 @@ export function useSessionWidget(): void {
     void updateSessionWidget({
       running: running.length,
       finished,
-      project: single ? basename(single.location?.directory) : "",
+      project: single ? basename(single.location?.directory) || single.title || "" : "",
       startedAt: single ? single.time.updated : 0,
+      sessions: running.slice(0, 12).map((s) => ({
+        project: basename(s.location?.directory) || s.title || "Session",
+        startedAt: s.time.updated,
+      })),
     });
   }, [native, list, activeMap, conversations]);
 }

@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
-import { readFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { OpenCodeClient, type OpenCodeInfo } from "./opencode.ts";
@@ -14,6 +13,24 @@ export type RunningBridge = {
 
 const ALLOW_HEADERS = "authorization, content-type, accept, x-requested-with";
 const ALLOW_METHODS = "GET, POST, PATCH, PUT, DELETE, OPTIONS";
+
+/** Common local dev-server ports probed for the in-app preview. */
+const DEV_PORTS = [3000, 3001, 3002, 4200, 4321, 5000, 5001, 5173, 5174, 7000, 8000, 8080, 8888, 9000, 1234, 1420, 4000, 6006];
+
+async function probeDevServers(): Promise<Array<{ port: number; url: string }>> {
+  const results = await Promise.all(
+    DEV_PORTS.map(async (port) => {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(700) });
+        if (res.status < 500) return { port, url: `http://127.0.0.1:${port}` };
+      } catch {
+        /* not reachable */
+      }
+      return null;
+    }),
+  );
+  return results.filter((r): r is { port: number; url: string } => r !== null);
+}
 
 const norm = (p: string) => resolve(p).replace(/\\/g, "/").toLowerCase().replace(/\/+$/, "");
 
@@ -68,6 +85,7 @@ export function startBridge(
   info: OpenCodeInfo | undefined,
   port: number,
   roots: string[] = [],
+  tls?: { cert: string; key: string },
 ): Promise<RunningBridge> {
   const startedAt = Date.now();
   let eventClients = 0;
@@ -111,6 +129,16 @@ export function startBridge(
         return;
       }
 
+      if (url.pathname === "/servers") {
+        const token = tokenFrom(req, url);
+        if (!config.anonymous && token !== config.token) {
+          send(401, { error: "unauthorized" });
+          return;
+        }
+        send(200, { servers: await probeDevServers() });
+        return;
+      }
+
       if (url.pathname.startsWith("/api/")) {
         const token = tokenFrom(req, url);
         if (!config.anonymous && token !== config.token) {
@@ -136,8 +164,8 @@ export function startBridge(
   };
 
   const server: Server =
-    config.tls && config.cert && config.key
-      ? (createHttpsServer({ cert: readFileSync(config.cert), key: readFileSync(config.key) }, requestHandler) as unknown as Server)
+    tls
+      ? (createHttpsServer({ cert: tls.cert, key: tls.key }, requestHandler) as unknown as Server)
       : createServer(requestHandler);
 
   // --- Event WebSocket -------------------------------------------------------

@@ -69,18 +69,31 @@ Android app ──HTTP + WebSocket──► companion bridge (Node) ──localh
   message rendering, abortable requests, chunked diff rendering.
 
 **Android & iOS**
-- **Android**: local notifications (questions, permissions, **"session finished"**), a
-  **home-screen widget** (running count, or a single session's project + live timer),
-  permissions management in Settings, notification icon, and an OpenCode launcher icon.
+- **Android**: local notifications (questions, permissions, **"session finished"**), a **responsive
+  home-screen widget** (and **lock-screen** where supported) that adapts to its size — one session
+  with a live timer when compact, a **list of running sessions** when there is room — permissions
+  management in Settings, notification icon, and an OpenCode launcher icon.
 - **iOS** (prepared, see [docs/ios.md](docs/ios.md)): Capacitor platform + **WidgetKit** widget
-  scaffold + iOS plugin writing to a shared App Group.
-- **Pairing deep link** `ai.opencode.remote://connect?host=…&port=…&token=…` (printed by the bridge).
+  (small/medium/large) + iOS plugin writing to a shared App Group.
+- **QR pairing**: the bridge prints an **ASCII QR** and writes `~/.opencode-remote/qr.png`; the app
+  can **scan a QR** from the camera (Settings → "Scan a QR") or open the pairing deep link
+  `ai.opencode.remote://connect?host=…&port=…&token=…`.
+
+**Windows tray**
+- `tray\start-tray.cmd` shows a **system-tray icon** with a panel to view the **QR code**, copy the
+  pairing link, and start/stop the bridge (reads `~/.opencode-remote/state.json`).
+
+**Preview**
+- **In-app preview** of what OpenCode produced: the bridge probes common dev-server ports
+  (`/servers`) and the app shows the site/dev server in an embedded browser — pick a detected
+  port or type one. Gated by an explicit **permission** prompt the first time.
 
 **Security**
-- Keep the bridge inside your **VPN** (WireGuard/OpenVPN) — the traffic is encrypted end-to-end by
-  the tunnel.
-- Optional **TLS** on the bridge: `--tls --cert <pem> --key <pem>` serves **HTTPS/WSS**; enable
-  "Encrypted connection (HTTPS/WSS)" in Settings.
+- Keep the bridge inside your **VPN** (WireGuard/OpenVPN) when you are away.
+- On **local Wi-Fi** the traffic is not encrypted by the tunnel, so the bridge supports **TLS**:
+  `--tls` (auto self-signed certificate, fingerprint printed) or `--tls --cert <pem> --key <pem>`.
+  Enable "Encrypted connection (HTTPS/WSS)" in Settings. The Android app trusts self-signed certs
+  for private/LAN hosts only, and also trusts user-installed CAs (e.g. mkcert) for full trust.
 - Bearer token auth; filesystem access restricted to project roots; **no secrets committed**.
 
 ---
@@ -150,6 +163,8 @@ The bridge (`bridge/`) is a small Node/TypeScript server. It:
 | `--host <addr>` / `--ports a,b,c` | Bind address / candidate ports |
 | `--anonymous` | Disable auth (dev only) |
 | `--allow-any-path` | Disable filesystem scoping (unsafe) |
+| `--tls` | Serve HTTPS/WSS (auto self-signed cert, or `--cert`/`--key`) |
+| `--cert <pem>` / `--key <pem>` | TLS certificate / key (optional) |
 
 The OpenCode service stays on **localhost**; only the bridge is exposed to the VPN.
 

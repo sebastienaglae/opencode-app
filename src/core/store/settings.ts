@@ -15,6 +15,7 @@ export type Settings = {
   lang: Lang;
   secure: boolean;
   onboarded: boolean;
+  previewAllowed: boolean;
   lastModel?: ModelRef;
   lastAgent?: string;
   hydrated: boolean;
@@ -35,6 +36,7 @@ const defaults: Omit<Settings, "hydrated"> = {
   lang: "fr",
   secure: false,
   onboarded: false,
+  previewAllowed: false,
 };
 
 type SettingsState = Settings & {

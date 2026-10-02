@@ -9,6 +9,7 @@ import { useSettings } from "./core/store/settings";
 import { useNotifications } from "./hooks/useNotifications";
 import { useSessionWidget } from "./hooks/useSessionWidget";
 import { setNavigator } from "./core/navigation";
+import { applyPairingLink } from "./core/pairing";
 import { useT } from "./core/i18n";
 import { Toaster } from "./components/Toaster";
 import { ConnectionBanner } from "./components/ConnectionBanner";
@@ -21,6 +22,7 @@ import FilesScreen from "./screens/FilesScreen";
 import ModelsScreen from "./screens/ModelsScreen";
 import CommandsScreen from "./screens/CommandsScreen";
 import ConsoleScreen from "./screens/ConsoleScreen";
+import PreviewScreen from "./screens/PreviewScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
 function RouterBridge() {
@@ -34,7 +36,7 @@ function RouterBridge() {
 function TabBar() {
   const t = useT();
   const { pathname } = useLocation();
-  if (pathname.startsWith("/session/") || pathname.startsWith("/console")) return null;
+  if (pathname.startsWith("/session/") || pathname.startsWith("/console") || pathname.startsWith("/preview")) return null;
   const tabs = [
     { to: "/projects", label: t("projects.title"), icon: chatbubblesOutline },
     { to: "/files", label: t("tab.files"), icon: folderOutline },
@@ -76,25 +78,7 @@ export default function App() {
       else void CapacitorApp.exitApp();
     });
     const urlSub = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
-      try {
-        const u = new URL(url);
-        const host = u.searchParams.get("host");
-        const port = Number(u.searchParams.get("port"));
-        const token = u.searchParams.get("token");
-        const secure = u.searchParams.get("secure");
-        const patch: { host?: string; port?: number; token?: string; secure?: boolean } = {};
-        if (host) patch.host = host;
-        if (port) patch.port = port;
-        if (token) patch.token = token;
-        if (secure) patch.secure = secure === "1" || secure === "true";
-        if (Object.keys(patch).length > 0) {
-          useSettings.getState().update(patch);
-          toast.success(t("toast.paired"));
-          void useConnection.getState().connect();
-        }
-      } catch {
-        /* ignore malformed pairing link */
-      }
+      if (applyPairingLink(url)) toast.success(t("toast.paired"));
     });
     return () => {
       void sub.then((handle) => handle.remove());
@@ -121,6 +105,7 @@ export default function App() {
               <Route path="/models" element={<ModelsScreen />} />
               <Route path="/commands" element={<CommandsScreen />} />
               <Route path="/console" element={<ConsoleScreen />} />
+              <Route path="/preview" element={<PreviewScreen />} />
               <Route path="/settings" element={<SettingsScreen />} />
               <Route path="*" element={<Navigate to="/projects" replace />} />
             </Routes>

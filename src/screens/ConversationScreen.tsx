@@ -451,6 +451,10 @@ export default function ConversationScreen() {
             },
           },
           {
+            label: t("preview.title"),
+            onClick: () => navigate("/preview"),
+          },
+          {
             label: t("conv.menu.diff"),
             onClick: () => {
               setDiffLimit(20);

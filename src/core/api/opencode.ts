@@ -256,6 +256,9 @@ export const api = {
   shellOutput: (id: string, signal?: AbortSignal) => request<ShellOutput>(`/api/shell/${id}/output`, { signal }),
   killShell: (id: string) => request<void>(`/api/shell/${id}`, { method: "DELETE" }),
 
+  // --- preview (dev servers) ------------------------------------------------
+  listServers: (signal?: AbortSignal) => request<{ servers: Array<{ port: number; url: string }> }>("/servers", { signal }),
+
   // --- config ---------------------------------------------------------------
   getConfig: () => request<Record<string, unknown>>("/api/config"),
 };

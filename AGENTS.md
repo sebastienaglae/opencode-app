@@ -63,6 +63,8 @@ service, then re-run the detection.
 - **Path scoping**: `/api/fs/*` is restricted to OpenCode project roots (from `/api/project`).
   Disable with `--allow-any-path` (unsafe).
 - Proxies the OpenCode HTTP API at the same paths; streams events over WebSocket at `/events`.
+- `GET /servers` lists reachable local dev-server ports (for the in-app preview).
+- Optional TLS (`--tls`, auto self-signed cert) serves HTTPS/WSS.
 
 ## Conventions
 
