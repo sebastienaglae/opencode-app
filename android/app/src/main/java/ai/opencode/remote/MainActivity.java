@@ -16,22 +16,32 @@ import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
 
+    private int safeTop = 0;
+    private int safeBottom = 0;
+    private int safeLeft = 0;
+    private int safeRight = 0;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SessionWidgetPlugin.class);
         super.onCreate(savedInstanceState);
 
-        Bridge bridge = getBridge();
+        final Bridge bridge = getBridge();
         if (bridge == null || bridge.getWebView() == null) {
             return;
         }
 
-        // 1) Keep the web content inside the system bars (edge-to-edge on Android 15+).
+        // 1) Expose the system-bar insets to the web layer as CSS variables so each
+        //    element can pad itself (no global WebView padding side effects).
         ViewCompat.setOnApplyWindowInsetsListener(bridge.getWebView(), (view, insets) -> {
             Insets bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
             );
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            safeTop = bars.top;
+            safeBottom = bars.bottom;
+            safeLeft = bars.left;
+            safeRight = bars.right;
+            injectInsets(bridge.getWebView());
             return insets;
         });
         bridge.getWebView().requestApplyInsets();
@@ -48,7 +58,23 @@ public class MainActivity extends BridgeActivity {
                     super.onReceivedSslError(view, handler, error);
                 }
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                injectInsets(view);
+            }
         });
+    }
+
+    private void injectInsets(WebView view) {
+        if (view == null) return;
+        String js =
+            "document.documentElement.style.setProperty('--safe-top','" + safeTop + "px');" +
+            "document.documentElement.style.setProperty('--safe-bottom','" + safeBottom + "px');" +
+            "document.documentElement.style.setProperty('--safe-left','" + safeLeft + "px');" +
+            "document.documentElement.style.setProperty('--safe-right','" + safeRight + "px');";
+        view.evaluateJavascript(js, null);
     }
 
     private static boolean isPrivateHost(String host) {

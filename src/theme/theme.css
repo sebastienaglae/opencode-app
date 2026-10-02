@@ -92,6 +92,21 @@ body {
   overscroll-behavior: none;
 }
 
+/* Safe-area helpers: native insets are injected as CSS variables on Android,
+   with env() as the fallback (iOS/web). */
+.pt-safe {
+  padding-top: var(--safe-top, env(safe-area-inset-top));
+}
+.pb-safe {
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom));
+}
+.pl-safe {
+  padding-left: var(--safe-left, env(safe-area-inset-left));
+}
+.pr-safe {
+  padding-right: var(--safe-right, env(safe-area-inset-right));
+}
+
 ion-content {
   --background: var(--oc-bg);
 }
