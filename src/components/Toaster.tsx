@@ -8,7 +8,7 @@ export function Toaster() {
   const toasts = useToast((s) => s.toasts);
   const dismiss = useToast((s) => s.dismiss);
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-3 z-[100] flex flex-col items-center gap-2 px-4">
+    <div className="pt-safe pointer-events-none fixed inset-x-0 top-0 z-[100] flex flex-col items-center gap-2 px-4">
       <AnimatePresence initial={false}>
         {toasts.map((t) => (
           <motion.button

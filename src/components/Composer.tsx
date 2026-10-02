@@ -165,7 +165,7 @@ export function Composer({
   const canSend = (text.trim().length > 0 || attachments.length > 0) && !sending;
 
   return (
-    <div className="pb-safe relative border-t border-border bg-bg px-3 pt-2">
+    <div className="relative border-t border-border bg-bg px-3 pb-2 pt-2">
       {suggestions.length > 0 && (
         <div className="absolute bottom-full left-3 right-3 z-20 mb-1 max-h-64 overflow-y-auto oc-scroll rounded-xl border border-border bg-elevated shadow-xl">
           {suggestions.map((c) => (

@@ -45,7 +45,7 @@ function TabBar() {
     { to: "/settings", label: t("tab.settings"), icon: settingsOutline },
   ];
   return (
-    <nav className="pb-safe flex border-t border-border bg-bg">
+    <nav className="flex border-t border-border bg-bg">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}
@@ -91,7 +91,7 @@ export default function App() {
     <IonApp>
       <HashRouter>
         <RouterBridge />
-        <div className="flex h-full flex-col bg-bg text-fg">
+        <div className="pt-safe pb-safe flex h-full flex-col bg-bg text-fg">
           <Toaster />
           <ConnectionBanner />
           <div className="relative min-h-0 flex-1">

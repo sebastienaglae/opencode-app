@@ -146,7 +146,7 @@ export default function ConsoleScreen() {
         )}
       </div>
 
-      <div className="pb-safe border-t border-border px-3 pt-2">
+      <div className="border-t border-border px-3 pb-2 pt-2">
         <div className="flex items-center gap-2">
           <input
             value={command}

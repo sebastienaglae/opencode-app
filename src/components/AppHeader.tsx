@@ -14,7 +14,7 @@ export function AppHeader({
   onSubtitleClick?: () => void;
 }) {
   return (
-    <header className="pt-safe shrink-0 border-b border-border">
+    <header className="shrink-0 border-b border-border">
       <div className="flex min-h-12 items-center gap-2 px-3 py-2">
         {left}
         <div className="min-w-0 flex-1">
