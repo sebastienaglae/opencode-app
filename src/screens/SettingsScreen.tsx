@@ -243,6 +243,7 @@ export default function SettingsScreen() {
             label={t("settings.security.secure")}
             hint={t("settings.security.hint")}
           />
+          {settings.secure && <div className="pt-1 text-[12px] text-accent">{t("settings.security.tlsHint")}</div>}
         </section>
 
         <div className="border-t border-border pt-4 text-[12px] text-faint">{t("settings.footer")}</div>

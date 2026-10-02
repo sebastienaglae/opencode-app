@@ -12,6 +12,8 @@
     "icons": "node scripts/gen-icons.mjs",
     "detect": "node scripts/detect-opencode.mjs",
     "bridge": "node bridge/src/index.ts",
+    "bridge:secure": "node bridge/src/index.ts --tls",
+    "tray": "powershell -ExecutionPolicy Bypass -File tray/opencode-remote-tray.ps1",
     "test:app": "node --test test/format.test.mjs test/tools.test.mjs",
     "test:bridge": "node --test bridge/test/sse.test.mjs bridge/test/config.test.mjs bridge/test/server.test.mjs",
     "test": "npm run test:app && npm run test:bridge",

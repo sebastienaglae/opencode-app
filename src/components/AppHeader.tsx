@@ -14,7 +14,7 @@ export function AppHeader({
   onSubtitleClick?: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-border px-3 pt-[env(safe-area-inset-top)] box-content">
+    <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-border px-3">
       {left}
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-bold leading-tight tracking-tight text-fg">OpenCode</div>

@@ -31,10 +31,13 @@ function Get-State {
 }
 
 function Start-Bridge {
+    param([switch]$Tls)
     $running = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like '*src/index.ts*' }
     if ($running) { return }
-    Start-Process -FilePath 'node' -ArgumentList 'src/index.ts' -WorkingDirectory $BridgeDir -WindowStyle Hidden
+    $args = @('src/index.ts')
+    if ($Tls) { $args += '--tls' }
+    Start-Process -FilePath 'node' -ArgumentList $args -WorkingDirectory $BridgeDir -WindowStyle Hidden
     Start-Sleep -Seconds 2
 }
 
@@ -165,6 +168,8 @@ $miCopy = $menu.Items.Add('Copier le lien')
 $miCopy.Add_Click({ $s = Get-State; if ($s) { [System.Windows.Forms.Clipboard]::SetText($s.link) } })
 $miStart = $menu.Items.Add('Démarrer le bridge')
 $miStart.Add_Click({ Start-Bridge })
+$miStartTls = $menu.Items.Add('Démarrer le bridge (TLS)')
+$miStartTls.Add_Click({ Start-Bridge -Tls })
 $miStop = $menu.Items.Add('Arrêter le bridge')
 $miStop.Add_Click({ Stop-Bridge })
 [void]$menu.Items.Add('-')

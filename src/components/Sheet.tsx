@@ -36,7 +36,7 @@ export function Sheet({
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <div className="text-[15px] font-semibold text-fg">{title}</div>
             </div>
-            <div className="oc-scroll overflow-y-auto pb-[calc(12px+env(safe-area-inset-bottom))]">{children}</div>
+            <div className="oc-scroll overflow-y-auto pb-3">{children}</div>
           </motion.div>
         </>
       )}

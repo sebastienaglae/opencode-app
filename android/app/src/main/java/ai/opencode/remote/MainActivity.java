@@ -6,6 +6,10 @@ import android.os.Bundle;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebView;
 
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -18,21 +22,33 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         Bridge bridge = getBridge();
-        if (bridge != null && bridge.getWebView() != null) {
-            bridge.getWebView().setWebViewClient(new BridgeWebViewClient(bridge) {
-                @Override
-                public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-                    // The bridge may serve HTTPS/WSS with a self-signed certificate.
-                    // Accept it only for private/LAN hosts (never for public hosts).
-                    String host = error.getUrl() != null ? Uri.parse(error.getUrl()).getHost() : null;
-                    if (isPrivateHost(host)) {
-                        handler.proceed();
-                    } else {
-                        super.onReceivedSslError(view, handler, error);
-                    }
-                }
-            });
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
         }
+
+        // 1) Keep the web content inside the system bars (edge-to-edge on Android 15+).
+        ViewCompat.setOnApplyWindowInsetsListener(bridge.getWebView(), (view, insets) -> {
+            Insets bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
+        bridge.getWebView().requestApplyInsets();
+
+        // 2) The bridge may serve HTTPS/WSS with a self-signed certificate.
+        //    Accept it only for private/LAN hosts (never for public hosts).
+        bridge.setWebViewClient(new BridgeWebViewClient(bridge) {
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                String host = error.getUrl() != null ? Uri.parse(error.getUrl()).getHost() : null;
+                if (isPrivateHost(host)) {
+                    handler.proceed();
+                } else {
+                    super.onReceivedSslError(view, handler, error);
+                }
+            }
+        });
     }
 
     private static boolean isPrivateHost(String host) {

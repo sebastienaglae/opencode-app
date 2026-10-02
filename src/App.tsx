@@ -45,7 +45,7 @@ function TabBar() {
     { to: "/settings", label: t("tab.settings"), icon: settingsOutline },
   ];
   return (
-    <nav className="flex border-t border-border bg-bg pb-[env(safe-area-inset-bottom)]">
+    <nav className="flex border-t border-border bg-bg">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}
