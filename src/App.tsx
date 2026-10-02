@@ -11,6 +11,8 @@ import { useSessionWidget } from "./hooks/useSessionWidget";
 import { setNavigator } from "./core/navigation";
 import { useT } from "./core/i18n";
 import { Toaster } from "./components/Toaster";
+import { ConnectionBanner } from "./components/ConnectionBanner";
+import { Onboarding } from "./components/Onboarding";
 import { toast } from "./core/store/toast";
 import ProjectsScreen from "./screens/ProjectsScreen";
 import ProjectSessionsScreen from "./screens/ProjectSessionsScreen";
@@ -69,16 +71,22 @@ export default function App() {
     const sub = CapacitorApp.addListener("appStateChange", ({ isActive }) => {
       if (isActive && useSettings.getState().hydrated) void useConnection.getState().connect();
     });
+    const backSub = CapacitorApp.addListener("backButton", () => {
+      if (window.history.length > 1) window.history.back();
+      else void CapacitorApp.exitApp();
+    });
     const urlSub = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
       try {
         const u = new URL(url);
         const host = u.searchParams.get("host");
         const port = Number(u.searchParams.get("port"));
         const token = u.searchParams.get("token");
-        const patch: { host?: string; port?: number; token?: string } = {};
+        const secure = u.searchParams.get("secure");
+        const patch: { host?: string; port?: number; token?: string; secure?: boolean } = {};
         if (host) patch.host = host;
         if (port) patch.port = port;
         if (token) patch.token = token;
+        if (secure) patch.secure = secure === "1" || secure === "true";
         if (Object.keys(patch).length > 0) {
           useSettings.getState().update(patch);
           toast.success(t("toast.paired"));
@@ -90,6 +98,7 @@ export default function App() {
     });
     return () => {
       void sub.then((handle) => handle.remove());
+      void backSub.then((handle) => handle.remove());
       void urlSub.then((handle) => handle.remove());
     };
   }, [t]);
@@ -100,6 +109,7 @@ export default function App() {
         <RouterBridge />
         <div className="flex h-full flex-col bg-bg text-fg">
           <Toaster />
+          <ConnectionBanner />
           <div className="relative min-h-0 flex-1">
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />
@@ -117,6 +127,7 @@ export default function App() {
           </div>
           <TabBar />
         </div>
+        <Onboarding />
       </HashRouter>
     </IonApp>
   );

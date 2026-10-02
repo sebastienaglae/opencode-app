@@ -8,6 +8,7 @@ import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
+import { AppHeader } from "../components/AppHeader";
 
 type Tab = "commands" | "skills" | "mcp";
 
@@ -56,9 +57,7 @@ export default function CommandsScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="border-b border-border px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        <span className="text-[16px] font-bold text-fg">{t("commands.title")}</span>
-      </header>
+      <AppHeader subtitle={t("commands.title")} />
       <div className="flex gap-1 border-b border-border px-3 py-2">
         {(["commands", "skills", "mcp"] as const).map((id) => (
           <button

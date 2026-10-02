@@ -9,6 +9,7 @@ import { useT } from "../core/i18n";
 import { useViewer } from "../core/navigation";
 import { CodeBlock } from "../components/CodeBlock";
 import { Sheet } from "../components/Sheet";
+import { AppHeader } from "../components/AppHeader";
 import { basename } from "../core/format";
 
 const EXT_LANG: Record<string, string> = {
@@ -75,13 +76,15 @@ export default function FilesScreen() {
   useEffect(() => setStack([undefined]), [directory]);
 
   const pendingFile = useViewer((s) => s.pendingFile);
+  const pendingDir = useViewer((s) => s.pendingDir);
   const clearPending = useViewer((s) => s.clear);
   useEffect(() => {
     if (pendingFile) {
+      if (pendingDir) setDirectory(pendingDir);
       setOpenFile(pendingFile);
       clearPending();
     }
-  }, [pendingFile, clearPending]);
+  }, [pendingFile, pendingDir, clearPending]);
 
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ["fs", directory, current],
@@ -115,20 +118,21 @@ export default function FilesScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="flex items-center gap-1 border-b border-border px-2 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        {stack.length > 1 && (
-          <button type="button" onClick={() => setStack((s) => s.slice(0, -1))} className="p-2 text-muted active:text-fg">
-            <IonIcon icon={arrowBackOutline} className="text-[20px]" />
+      <AppHeader
+        left={
+          stack.length > 1 ? (
+            <button type="button" onClick={() => setStack((s) => s.slice(0, -1))} className="p-1.5 text-muted active:text-fg" aria-label={t("common.back")}>
+              <IonIcon icon={arrowBackOutline} className="text-[20px]" />
+            </button>
+          ) : undefined
+        }
+        subtitle={current ? basename(current) : t("files.title")}
+        right={
+          <button type="button" onClick={() => setPickerOpen(true)} className="flex items-center gap-1 p-1.5 text-muted active:text-fg" aria-label={t("files.chooseProject")}>
+            <IonIcon icon={swapHorizontalOutline} className="text-[18px]" />
           </button>
-        )}
-        <div className="min-w-0 flex-1 px-2">
-          <div className="truncate text-[16px] font-bold text-fg">{current ? basename(current) : t("files.title")}</div>
-          {directory && <div className="truncate font-mono text-[11px] text-faint">{directory}</div>}
-        </div>
-        <button type="button" onClick={() => setPickerOpen(true)} className="flex items-center gap-1 p-2 text-muted active:text-fg">
-          <IonIcon icon={swapHorizontalOutline} className="text-[18px]" />
-        </button>
-      </header>
+        }
+      />
 
       <div className="oc-scroll min-h-0 flex-1 overflow-y-auto">
         {status !== "connected" ? (

@@ -93,6 +93,16 @@ The composer supports `!command` (one-shot remote shell) and `/terminal` opens t
 Under the hood: `POST /api/shell { command, cwd }` then `GET /api/shell/{id}/output`. The bridge
 proxies these; the working directory defaults to the session's project.
 
+## iOS
+
+The iOS platform is scaffolded; the widget (WidgetKit) and iOS plugin live in `ios/App/` and
+`docs/ios.md` explains the Xcode wiring. Building requires macOS + Xcode.
+
+## Security
+
+- The bridge stays inside the user's VPN; optional TLS via `--tls --cert --key` (HTTPS/WSS).
+- Never commit tokens, LAN IPs, personal paths, or session data. Screenshots use generic data.
+
 ## Do not
 
 - Do not edit or delete OpenCode's database, `service.json`, or config.

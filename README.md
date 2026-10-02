@@ -60,15 +60,28 @@ Android app ──HTTP + WebSocket──► companion bridge (Node) ──localh
 **Experience**
 - **Dark + light**, OpenCode-like, **Tailwind CSS v4** + **Motion** animations.
 - **Toast** notifications for every action, robust clipboard copy (works in the WebView).
-- **Full i18n (French + English)** — every user-facing string, plus localized dates/numbers.
+- **Full i18n (French, English, Japanese)** — every user-facing string, plus localized dates/numbers.
+- **First-launch onboarding** that requests permissions (notifications/camera).
+- **Constant-height header** ("OpenCode" + section) and **Android back-gesture** support.
+- **Prominent offline/unauthorized banner** everywhere, with a one-tap fix.
+- **Default model** picked from your last used model / recent sessions (never left empty).
 - **Performance**: only the latest messages load (older ones paginate on scroll-up), memoized
   message rendering, abortable requests, chunked diff rendering.
 
-**Android**
-- **Local notifications**: permission prompts, questions, and a **"session finished"** alert.
-- **Home-screen widget**: "N sessions running", or for a single running session its **project name
-  and a live elapsed timer**; shows how many finished.
-- Cleartext LAN traffic, notification permission, and OpenCode launcher icon configured.
+**Android & iOS**
+- **Android**: local notifications (questions, permissions, **"session finished"**), a
+  **home-screen widget** (running count, or a single session's project + live timer),
+  permissions management in Settings, notification icon, and an OpenCode launcher icon.
+- **iOS** (prepared, see [docs/ios.md](docs/ios.md)): Capacitor platform + **WidgetKit** widget
+  scaffold + iOS plugin writing to a shared App Group.
+- **Pairing deep link** `ai.opencode.remote://connect?host=…&port=…&token=…` (printed by the bridge).
+
+**Security**
+- Keep the bridge inside your **VPN** (WireGuard/OpenVPN) — the traffic is encrypted end-to-end by
+  the tunnel.
+- Optional **TLS** on the bridge: `--tls --cert <pem> --key <pem>` serves **HTTPS/WSS**; enable
+  "Encrypted connection (HTTPS/WSS)" in Settings.
+- Bearer token auth; filesystem access restricted to project roots; **no secrets committed**.
 
 ---
 
@@ -173,7 +186,7 @@ npm run lint
 
 ## Internationalization
 
-All strings live in `src/core/i18n.ts` (`fr` + `en`). Dates/numbers use `Intl` via
+All strings live in `src/core/i18n.ts` (**fr**, **en**, **ja**). Dates/numbers use `Intl` via
 `src/core/format.ts`. To add a language: add a dictionary in `i18n.ts`, extend `LANGUAGES`,
 and add a `values-<lang>/strings.xml` for the Android widget.
 

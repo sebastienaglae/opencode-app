@@ -2,7 +2,8 @@ import { create } from "zustand";
 
 type ViewerState = {
   pendingFile: string | null;
-  open: (path: string) => void;
+  pendingDir: string | null;
+  open: (path: string, directory?: string) => void;
   clear: () => void;
 };
 
@@ -10,9 +11,15 @@ type ViewerState = {
  *  Files viewer without prop-drilling the router. */
 export const useViewer = create<ViewerState>((set) => ({
   pendingFile: null,
-  open: (path) => set({ pendingFile: path }),
-  clear: () => set({ pendingFile: null }),
+  pendingDir: null,
+  open: (path, directory) => set({ pendingFile: path, pendingDir: directory ?? null }),
+  clear: () => set({ pendingFile: null, pendingDir: null }),
 }));
+
+let currentProjectDir: string | null = null;
+export function setProjectDir(dir: string | undefined): void {
+  currentProjectDir = dir && dir.length > 0 ? dir : null;
+}
 
 let navigateFn: ((to: string) => void) | null = null;
 export function setNavigator(fn: (to: string) => void): void {
@@ -44,7 +51,7 @@ export function stripFileUrl(value: string): string {
   return v;
 }
 
-export function openFileInViewer(value: string): void {
-  useViewer.getState().open(stripFileUrl(value));
+export function openFileInViewer(value: string, directory?: string): void {
+  useViewer.getState().open(stripFileUrl(value), directory ?? currentProjectDir ?? undefined);
   navigateTo("/files");
 }

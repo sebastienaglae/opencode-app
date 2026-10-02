@@ -34,7 +34,7 @@ export async function notify(title: string, body: string): Promise<void> {
       if (!granted) return;
     }
     await LocalNotifications.schedule({
-      notifications: [{ id: Math.floor(Math.random() * 1_000_000), title, body }],
+      notifications: [{ id: Math.floor(Math.random() * 1_000_000), title, body, smallIcon: "ic_stat_opencode" }],
     });
   } catch {
     /* ignore */

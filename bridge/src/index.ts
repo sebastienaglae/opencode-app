@@ -77,7 +77,8 @@ async function main() {
   lines.push("  OpenCode Remote bridge is running");
   lines.push("  ─────────────────────────────────────────────");
   lines.push(`  OpenCode service : ${client.baseUrl}${info ? `  (v${info.version})` : "  (unreachable)"}`);
-  lines.push(`  Bridge listening : ${config.host}:${running.port}`);
+  const scheme = config.tls ? "https" : "http";
+  lines.push(`  Bridge listening : ${scheme}://${config.host}:${running.port}`);
   lines.push(`  Auth             : ${config.anonymous ? "anonymous (disabled)" : `Bearer ${config.token}`}`);
   lines.push(`  Path scope       : ${config.allowAnyPath ? "ANY (unsafe)" : `${roots.length} project root(s)`}`);
   lines.push("");
@@ -87,10 +88,10 @@ async function main() {
     lines.push(`    host: ${a.padEnd(15)} port: ${running.port}   (LAN / VPN)`);
   }
   lines.push("");
-  lines.push("  Event stream: ws://<host>:" + running.port + "/events?token=<token>");
+  lines.push(`  Event stream: ${config.tls ? "wss" : "ws"}://<host>:` + running.port + "/events?token=<token>");
   lines.push("");
   if (!config.anonymous && addrs[0]) {
-    const pair = `ai.opencode.remote://connect?host=${addrs[0]}&port=${running.port}&token=${config.token}`;
+    const pair = `ai.opencode.remote://connect?host=${addrs[0]}&port=${running.port}&token=${config.token}${config.tls ? "&secure=1" : ""}`;
     lines.push("  Pairing link (Android app):");
     lines.push(`    ${pair}`);
     lines.push("    adb shell \"am start -a android.intent.action.VIEW -d '" + pair + "'\"");

@@ -9,6 +9,7 @@ import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { providerLabel, sortProviders, statusLabel, effortLabel } from "../core/models";
 import { formatTokens } from "../core/format";
+import { AppHeader } from "../components/AppHeader";
 
 export default function ModelsScreen() {
   const t = useT();
@@ -37,9 +38,7 @@ export default function ModelsScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="border-b border-border px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        <span className="text-[16px] font-bold text-fg">{t("models.title")}</span>
-      </header>
+      <AppHeader subtitle={t("models.title")} />
       <div className="border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 rounded-lg bg-surface2 px-3 py-1.5">
           <IonIcon icon={searchOutline} className="text-[16px] text-faint" />

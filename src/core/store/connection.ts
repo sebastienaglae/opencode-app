@@ -8,12 +8,12 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "er
 
 type ProbeResult = { port: number; info: ServerInfo; latency: number };
 
-async function probePort(host: string, port: number, _token: string, timeoutMs: number): Promise<ProbeResult | null> {
+async function probePort(host: string, port: number, _token: string, timeoutMs: number, secure = false): Promise<ProbeResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const started = performance.now();
   try {
-    const res = await fetch(`http://${host}:${port}/health`, { signal: controller.signal });
+    const res = await fetch(`${secure ? "https" : "http"}://${host}:${port}/health`, { signal: controller.signal });
     if (!res.ok) return null;
     const body = (await res.json()) as { ok?: boolean; opencode?: { version?: string; pid?: number } };
     if (!body.ok) return null;
@@ -38,6 +38,7 @@ async function probePort(host: string, port: number, _token: string, timeoutMs: 
 type ConnectionState = {
   status: ConnectionStatus;
   error?: string;
+  authorized?: boolean;
   serverInfo?: ServerInfo;
   latency?: number;
   effectivePort?: number;
@@ -61,15 +62,15 @@ export const useConnection = create<ConnectionState>((set) => ({
     if (connectInFlight) return false;
     connectInFlight = true;
     try {
-      const { host, port, token, candidatePorts } = useSettings.getState();
+      const { host, port, token, candidatePorts, secure } = useSettings.getState();
       set({ status: "connecting", error: undefined });
 
     // Probe the configured port first; only fall back to the candidate list if
     // it does not answer.
-    let found = await probePort(host, port, token, 1500);
+    let found = await probePort(host, port, token, 1500, secure);
     if (!found) {
       const others = candidatePorts.filter((p) => p !== port);
-      const results = await Promise.all(others.map((p) => probePort(host, p, token, 1200)));
+      const results = await Promise.all(others.map((p) => probePort(host, p, token, 1200, secure)));
       found = results.find((r): r is ProbeResult => r !== null) ?? null;
     }
 
@@ -85,13 +86,15 @@ export const useConnection = create<ConnectionState>((set) => ({
     }
 
     if (found.port !== port) useSettings.getState().update({ port: found.port });
-    eventStream.connect(host, found.port, token);
-    set({ status: "connected", serverInfo: found.info, latency: found.latency, effectivePort: found.port });
+    eventStream.connect(host, found.port, token, secure);
+    set({ status: "connected", serverInfo: found.info, latency: found.latency, effectivePort: found.port, authorized: undefined });
     // Validate the API surface end-to-end (bridge proxy → OpenCode).
     try {
       await api.serverInfo();
+      set({ authorized: true, error: undefined });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      const status = (err as { status?: number }).status;
+      set({ authorized: false, error: status === 401 ? "unauthorized" : err instanceof Error ? err.message : String(err) });
     }
     return true;
     } finally {

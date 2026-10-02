@@ -76,6 +76,9 @@ export type BridgeConfig = {
   corsOrigin: string;
   anonymous: boolean;
   allowAnyPath: boolean;
+  tls: boolean;
+  cert?: string;
+  key?: string;
   configFile: string;
 };
 
@@ -88,6 +91,9 @@ export type CliOptions = {
   cors?: string;
   anonymous?: boolean;
   allowAnyPath?: boolean;
+  tls?: boolean;
+  cert?: string;
+  key?: string;
   serviceFile?: string;
   configFile?: string;
 };
@@ -113,6 +119,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break;
       case "--anonymous": opts.anonymous = true; break;
       case "--allow-any-path": opts.allowAnyPath = true; break;
+      case "--tls": opts.tls = true; break;
+      case "--cert": opts.cert = next(); break;
+      case "--key": opts.key = next(); break;
       case "--help":
       case "-h":
         printHelp();
@@ -136,6 +145,9 @@ Options:
   --cors <origin>       Allowed CORS origin (default: *)
   --anonymous           Disable token authentication (LAN/dev only)
   --allow-any-path      Allow filesystem access outside project roots (unsafe)
+  --tls                 Serve HTTPS/WSS (requires --cert and --key)
+  --cert <pem>          TLS certificate file
+  --key <pem>           TLS private key file
   --service-file <path> Explicit OpenCode service.json path
   --config-file <path>  Where to persist the generated token
   -h, --help            Show this help
@@ -172,6 +184,9 @@ export function loadConfig(opts: CliOptions): BridgeConfig {
     corsOrigin: opts.cors ?? "*",
     anonymous: opts.anonymous ?? false,
     allowAnyPath: opts.allowAnyPath ?? false,
+    tls: opts.tls ?? false,
+    cert: opts.cert,
+    key: opts.key,
     configFile,
   };
 }

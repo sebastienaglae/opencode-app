@@ -502,3 +502,26 @@ Décisions prises suite au premier test sur téléphone :
 - Correctif StrictMode : le flag d'annulation du polling était invalidé par le double-montage React.
 - Docs : README (section exécution distante), AGENTS.md, mockups sanitizés.
 
+---
+
+## 18. Quatrième passe (v0.6) — production ready
+
+- **Non autorisé / hors ligne** : bannière proéminente globale (`ConnectionBanner`) avec
+  message clair + « Réessayer » / « Configurer » ; flag `authorized` dans le store de connexion.
+- **Headers à hauteur constante** : composant `AppHeader` (« OpenCode » en haut + sous-titre
+  = section/contexte) appliqué à tous les écrans.
+- **Retour Android** : gestion du geste/bouton retour (`backButton`) → `history.back()`.
+- **Japonais** : dictionnaire `ja` complet + `values-ja` pour le widget.
+- **Onboarding** : landing au premier lancement demandant les permissions (notifications).
+- **Permissions** : section Réglages (notifications/caméra) avec état + bouton d'autorisation.
+- **Modèle par défaut** : préférence basée sur le dernier modèle utilisé / sessions récentes ;
+  jamais vide (auto-appliqué si la session n'a pas de modèle).
+- **Icône de notification** : `ic_stat_opencode` (monochrome) + `smallIcon` défini.
+- **Liens de fichiers** : résolus par rapport au **dossier du projet** courant ; la visionneuse
+  reçoit le bon répertoire.
+- **Sécurité / TLS** : bridge `--tls --cert --key` → HTTPS/WSS ; option « Connexion chiffrée »
+  dans les Réglages ; doc sécurité (VPN + TLS). **Aucun secret dans le dépôt** (token, IP perso
+  retirée du code ; artefacts iOS/Android ignorés).
+- **iOS préparé** : plateforme Capacitor iOS + widget WidgetKit + plugin iOS (App Group) +
+  `docs/ios.md`.
+

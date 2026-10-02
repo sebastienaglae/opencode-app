@@ -13,6 +13,8 @@ export type Settings = {
   token: string;
   theme: ThemeMode;
   lang: Lang;
+  secure: boolean;
+  onboarded: boolean;
   lastModel?: ModelRef;
   lastAgent?: string;
   hydrated: boolean;
@@ -25,12 +27,14 @@ export const DEFAULT_CANDIDATE_PORTS = [
 ];
 
 const defaults: Omit<Settings, "hydrated"> = {
-  host: "192.168.1.133",
+  host: "",
   port: 47821,
   candidatePorts: DEFAULT_CANDIDATE_PORTS,
   token: "",
   theme: "dark",
   lang: "fr",
+  secure: false,
+  onboarded: false,
 };
 
 type SettingsState = Settings & {

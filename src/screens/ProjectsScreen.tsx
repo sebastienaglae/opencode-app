@@ -11,7 +11,7 @@ import { cn } from "../core/cn";
 import { basename, formatRelative } from "../core/format";
 import { copyText } from "../core/clipboard";
 import { toast } from "../core/store/toast";
-import { Mark } from "../components/Mark";
+import { AppHeader } from "../components/AppHeader";
 import type { Project } from "../core/types";
 
 export default function ProjectsScreen() {
@@ -87,15 +87,15 @@ export default function ProjectsScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="flex items-center gap-2 border-b border-border px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        <Mark className="h-[15px] w-3 text-fg" />
-        <span className="text-[16px] font-bold tracking-tight text-fg">OpenCode</span>
-        <span className="flex-1" />
-        <span
-          className={cn("h-2 w-2 rounded-full", status === "connected" ? "bg-success" : status === "connecting" ? "bg-info oc-pulse" : "bg-faint")}
-          title={status}
-        />
-      </header>
+      <AppHeader
+        subtitle={t("projects.title")}
+        right={
+          <span
+            className={cn("h-2 w-2 rounded-full", status === "connected" ? "bg-success" : status === "connecting" ? "bg-info oc-pulse" : "bg-faint")}
+            title={status}
+          />
+        }
+      />
 
       <div className="oc-scroll min-h-0 flex-1 overflow-y-auto">
         {status !== "connected" ? (

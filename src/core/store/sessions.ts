@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "../api/opencode";
 import { eventStream } from "../events";
+import { useSettings } from "./settings";
 import type {
   AssistantMessage,
   AssistantPart,
@@ -203,7 +204,9 @@ export const useSessions = create<SessionsState>((set, get) => {
     },
 
     createSession: async (body) => {
-      const session = await api.createSession(body);
+      const fallback = useSettings.getState().lastModel ?? get().list.find((s) => s.model)?.model;
+      const model = body.model ?? fallback;
+      const session = await api.createSession({ ...body, model });
       get().upsertSession(session);
       return session;
     },
@@ -216,12 +219,14 @@ export const useSessions = create<SessionsState>((set, get) => {
 
     setSessionModel: async (id, model) => {
       await api.setSessionModel(id, model);
+      useSettings.getState().update({ lastModel: model });
       const session = get().list.find((s) => s.id === id);
       if (session) get().upsertSession({ ...session, model });
     },
 
     setSessionAgent: async (id, agent) => {
       await api.setSessionAgent(id, agent);
+      useSettings.getState().update({ lastAgent: agent });
       const session = get().list.find((s) => s.id === id);
       if (session) get().upsertSession({ ...session, agent });
     },

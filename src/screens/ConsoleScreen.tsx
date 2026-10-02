@@ -9,6 +9,7 @@ import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { formatDuration } from "../core/format";
 import { CodeBlock } from "../components/CodeBlock";
+import { AppHeader } from "../components/AppHeader";
 
 type Entry = {
   key: string;
@@ -90,23 +91,19 @@ export default function ConsoleScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="flex items-center gap-1 border-b border-border px-2 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        <button type="button" onClick={() => navigate(-1)} className="p-2 text-muted active:text-fg" aria-label={t("common.back")}>
-          <IonIcon icon={arrowBackOutline} className="text-[20px]" />
-        </button>
-        <div className="min-w-0 flex-1 px-1">
-          <div className="text-[16px] font-bold text-fg">{t("console.title")}</div>
-          {cwd && <div className="truncate font-mono text-[11px] text-faint">{cwd}</div>}
-        </div>
-        <button
-          type="button"
-          onClick={() => setEntries([])}
-          className="p-2 text-muted active:text-fg"
-          aria-label={t("console.clear")}
-        >
-          <IonIcon icon={trashOutline} className="text-[18px]" />
-        </button>
-      </header>
+      <AppHeader
+        left={
+          <button type="button" onClick={() => navigate(-1)} className="p-1.5 text-muted active:text-fg" aria-label={t("common.back")}>
+            <IonIcon icon={arrowBackOutline} className="text-[20px]" />
+          </button>
+        }
+        subtitle={cwd || t("console.title")}
+        right={
+          <button type="button" onClick={() => setEntries([])} className="p-1.5 text-muted active:text-fg" aria-label={t("console.clear")}>
+            <IonIcon icon={trashOutline} className="text-[18px]" />
+          </button>
+        }
+      />
 
       <div ref={listRef} className="oc-scroll min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {status !== "connected" ? (

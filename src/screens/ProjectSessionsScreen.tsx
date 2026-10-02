@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
-import { addOutline, arrowBackOutline, copyOutline, ellipsisHorizontal, searchOutline } from "ionicons/icons";
+import { addOutline, arrowBackOutline, ellipsisHorizontal, searchOutline } from "ionicons/icons";
 import { api } from "../core/api/opencode";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { basename, formatRelative } from "../core/format";
 import { ActionSheet } from "../components/Sheet";
+import { AppHeader } from "../components/AppHeader";
+import { copyText } from "../core/clipboard";
+import { toast } from "../core/store/toast";
 import type { SessionInfo } from "../core/types";
 
 export default function ProjectSessionsScreen() {
@@ -70,24 +73,15 @@ export default function ProjectSessionsScreen() {
 
   return (
     <div className="relative flex h-full flex-col bg-bg">
-      <header className="flex items-center gap-1 border-b border-border px-2 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))]">
-        <button type="button" onClick={() => navigate("/projects")} className="p-2 text-muted active:text-fg" aria-label={t("common.back")}>
-          <IonIcon icon={arrowBackOutline} className="text-[20px]" />
-        </button>
-        <div className="min-w-0 flex-1 px-1">
-          <div className="truncate text-[16px] font-bold text-fg">{projectName}</div>
-          {directory && (
-            <button
-              type="button"
-              onClick={() => void navigator.clipboard.writeText(directory).catch(() => {})}
-              className="flex max-w-full items-center gap-1 text-left"
-            >
-              <span className="truncate font-mono text-[11px] text-faint">{directory}</span>
-              <IonIcon icon={copyOutline} className="shrink-0 text-[12px] text-faint" />
-            </button>
-          )}
-        </div>
-      </header>
+      <AppHeader
+        left={
+          <button type="button" onClick={() => navigate("/projects")} className="p-1.5 text-muted active:text-fg" aria-label={t("common.back")}>
+            <IonIcon icon={arrowBackOutline} className="text-[20px]" />
+          </button>
+        }
+        subtitle={projectName}
+        onSubtitleClick={directory ? () => void copyText(directory).then((ok) => toast[ok ? "success" : "error"](ok ? t("toast.copied") : t("toast.copyFailed"))) : undefined}
+      />
 
       <div className="border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 rounded-lg bg-surface2 px-3 py-2">

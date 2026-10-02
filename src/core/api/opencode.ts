@@ -35,8 +35,8 @@ export class ApiError extends Error {
 }
 
 export function baseUrl(): string {
-  const { host, port } = useSettings.getState();
-  return `http://${host}:${port}`;
+  const { host, port, secure } = useSettings.getState();
+  return `${secure ? "https" : "http"}://${host}:${port}`;
 }
 
 function authHeaders(): Record<string, string> {

@@ -1,4 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { readFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { OpenCodeClient, type OpenCodeInfo } from "./opencode.ts";
@@ -72,7 +74,7 @@ export function startBridge(
   let eventAbort: AbortController | null = null;
   const sockets = new Set<WebSocket>();
 
-  const server = createServer(async (req, res) => {
+  const requestHandler = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const origin = typeof req.headers.origin === "string" ? req.headers.origin : config.corsOrigin;
 
@@ -131,7 +133,12 @@ export function startBridge(
         res.end();
       }
     }
-  });
+  };
+
+  const server: Server =
+    config.tls && config.cert && config.key
+      ? (createHttpsServer({ cert: readFileSync(config.cert), key: readFileSync(config.key) }, requestHandler) as unknown as Server)
+      : createServer(requestHandler);
 
   // --- Event WebSocket -------------------------------------------------------
   const wss = new WebSocketServer({ noServer: true });

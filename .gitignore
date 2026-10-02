@@ -32,6 +32,12 @@ android/.idea
 android/app/src/main/assets/public
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+ios/App/App/public
+ios/App/App/capacitor.config.json
+ios/App/Pods
+ios/App/build
+ios/DerivedData
+*.xcuserstate
 
 # Local bridge state
 .opencode-remote

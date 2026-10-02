@@ -19,8 +19,9 @@ class EventStream {
   private closedByUser = false;
   private status: EventStreamStatus = "idle";
 
-  connect(host: string, port: number, token: string): void {
-    const url = `ws://${host}:${port}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  connect(host: string, port: number, token: string, secure = false): void {
+    const scheme = secure ? "wss" : "ws";
+    const url = `${scheme}://${host}:${port}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
     if (this.url === url && (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING)) {
       return;
     }

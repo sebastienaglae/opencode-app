@@ -8,9 +8,11 @@ import { api } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { setProjectDir } from "../core/navigation";
 import { copyText } from "../core/clipboard";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
+import { useSettings } from "../core/store/settings";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 import { formatCost, formatDateTime, formatUsage } from "../core/format";
@@ -26,6 +28,7 @@ import { StatsBlock } from "../components/StatsBlock";
 import { DiffView } from "../components/DiffView";
 import { CodeBlock } from "../components/CodeBlock";
 import { Sheet, ActionSheet } from "../components/Sheet";
+import { AppHeader } from "../components/AppHeader";
 
 export default function ConversationScreen() {
   const { id } = useParams<{ id: string }>();
@@ -74,10 +77,17 @@ export default function ConversationScreen() {
     refetchInterval: 6000,
   });
   const sessionList = useSessions((s) => s.list);
+  const lastModel = useSettings((s) => s.lastModel);
+  const defaultModel = lastModel ?? sessionList.find((s) => s.model)?.model;
   const runningAgents = useMemo(
     () => sessionList.filter((s) => s.parentID === id && activeMap[s.id]),
     [sessionList, id, activeMap],
   );
+
+  useEffect(() => {
+    if (!id || !session) return;
+    if (!session.model && defaultModel) void useSessions.getState().setSessionModel(id, defaultModel);
+  }, [id, session, defaultModel]);
   const { data: diff, isLoading: diffLoading } = useQuery({
     queryKey: ["diff", id],
     queryFn: () => api.sessionDiff(id!),
@@ -92,6 +102,10 @@ export default function ConversationScreen() {
     if (useSessions.getState().list.length === 0) void useSessions.getState().loadSessions();
     return () => useSessions.getState().abortLoad(id);
   }, [id]);
+
+  useEffect(() => {
+    setProjectDir(session?.location?.directory);
+  }, [session?.location?.directory]);
 
   // Keep pinned to the bottom without a visible jump.
   useLayoutEffect(() => {
@@ -309,26 +323,31 @@ export default function ConversationScreen() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="flex items-center gap-1 border-b border-border px-2 pb-2 pt-[calc(8px+env(safe-area-inset-top))]">
-        <button type="button" onClick={() => navigate(-1)} className="p-2 text-muted active:text-fg" aria-label={t("common.back")}>
-          <IonIcon icon={arrowBackOutline} className="text-[20px]" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-semibold text-fg">{session?.title || t("app.name")}</div>
-          {runningAgents.length > 0 && (
-            <div className="truncate text-[11px] text-accent">{t("conv.agents.running", { count: runningAgents.length })}</div>
-          )}
-        </div>
-        {conv?.running && (
-          <button type="button" onClick={() => void useSessions.getState().interrupt(id)} className="p-2 text-danger" aria-label={t("conv.stop")}>
-            <IonIcon icon={stopCircleOutline} className="text-[20px]" />
+      <AppHeader
+        left={
+          <button type="button" onClick={() => navigate(-1)} className="p-1.5 text-muted active:text-fg" aria-label={t("common.back")}>
+            <IonIcon icon={arrowBackOutline} className="text-[20px]" />
           </button>
-        )}
-        <ContextRing used={contextUsed} limit={contextLimit} onClick={() => setContextOpen(true)} />
-        <button type="button" onClick={() => setMenuOpen(true)} className="p-2 text-muted active:text-fg" aria-label="menu">
-          <IonIcon icon={ellipsisHorizontal} className="text-[20px]" />
-        </button>
-      </header>
+        }
+        subtitle={
+          runningAgents.length > 0
+            ? `${session?.title || t("app.name")} · ${t("conv.agents.running", { count: runningAgents.length })}`
+            : session?.title || t("conv.empty").split(".")[0]
+        }
+        right={
+          <>
+            {conv?.running && (
+              <button type="button" onClick={() => void useSessions.getState().interrupt(id)} className="p-1.5 text-danger" aria-label={t("conv.stop")}>
+                <IonIcon icon={stopCircleOutline} className="text-[20px]" />
+              </button>
+            )}
+            <ContextRing used={contextUsed} limit={contextLimit} onClick={() => setContextOpen(true)} />
+            <button type="button" onClick={() => setMenuOpen(true)} className="p-1.5 text-muted active:text-fg" aria-label="menu">
+              <IonIcon icon={ellipsisHorizontal} className="text-[20px]" />
+            </button>
+          </>
+        }
+      />
 
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={onScroll} className="oc-scroll h-full overflow-y-auto px-3.5 pb-4">
@@ -402,7 +421,7 @@ export default function ConversationScreen() {
         onSend={handleSend}
         onStop={() => void useSessions.getState().interrupt(id)}
         onShell={runShell}
-        modelLabel={modelLabel(session?.model, models)}
+        modelLabel={modelLabel(session?.model ?? defaultModel, models) || t("model.choose")}
         agentLabel={session?.agent}
         onOpenModel={() => setModelOpen(true)}
         onOpenAgent={() => setAgentOpen(true)}

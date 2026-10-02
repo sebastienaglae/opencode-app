@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="widget_description">OpenCode セッションの状態</string>
+    <string name="widget_app">OpenCode</string>
+    <string name="widget_none">セッションなし</string>
+    <string name="widget_running_one">1 セッション実行中</string>
+    <string name="widget_running_many">%1$d セッション実行中</string>
+    <string name="widget_finished">%1$d 完了</string>
+    <string name="widget_finished_only">%1$d セッション完了</string>
+</resources>
