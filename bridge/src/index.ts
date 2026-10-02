@@ -89,6 +89,13 @@ async function main() {
   lines.push("");
   lines.push("  Event stream: ws://<host>:" + running.port + "/events?token=<token>");
   lines.push("");
+  if (!config.anonymous && addrs[0]) {
+    const pair = `ai.opencode.remote://connect?host=${addrs[0]}&port=${running.port}&token=${config.token}`;
+    lines.push("  Pairing link (Android app):");
+    lines.push(`    ${pair}`);
+    lines.push("    adb shell \"am start -a android.intent.action.VIEW -d '" + pair + "'\"");
+    lines.push("");
+  }
   console.log(lines.join("\n"));
 
   const shutdown = () => {

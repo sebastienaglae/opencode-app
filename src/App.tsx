@@ -11,6 +11,7 @@ import { useSessionWidget } from "./hooks/useSessionWidget";
 import { setNavigator } from "./core/navigation";
 import { useT } from "./core/i18n";
 import { Toaster } from "./components/Toaster";
+import { toast } from "./core/store/toast";
 import ProjectsScreen from "./screens/ProjectsScreen";
 import ProjectSessionsScreen from "./screens/ProjectSessionsScreen";
 import ConversationScreen from "./screens/ConversationScreen";
@@ -60,6 +61,7 @@ function TabBar() {
 }
 
 export default function App() {
+  const t = useT();
   useNotifications();
   useSessionWidget();
   useEffect(() => {
@@ -67,10 +69,30 @@ export default function App() {
     const sub = CapacitorApp.addListener("appStateChange", ({ isActive }) => {
       if (isActive && useSettings.getState().hydrated) void useConnection.getState().connect();
     });
+    const urlSub = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      try {
+        const u = new URL(url);
+        const host = u.searchParams.get("host");
+        const port = Number(u.searchParams.get("port"));
+        const token = u.searchParams.get("token");
+        const patch: { host?: string; port?: number; token?: string } = {};
+        if (host) patch.host = host;
+        if (port) patch.port = port;
+        if (token) patch.token = token;
+        if (Object.keys(patch).length > 0) {
+          useSettings.getState().update(patch);
+          toast.success(t("toast.paired"));
+          void useConnection.getState().connect();
+        }
+      } catch {
+        /* ignore malformed pairing link */
+      }
+    });
     return () => {
       void sub.then((handle) => handle.remove());
+      void urlSub.then((handle) => handle.remove());
     };
-  }, []);
+  }, [t]);
 
   return (
     <IonApp>
