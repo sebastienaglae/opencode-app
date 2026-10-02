@@ -417,6 +417,7 @@ export default function ConversationScreen() {
       </div>
 
       <Composer
+        sessionID={id}
         running={Boolean(conv?.running)}
         onSend={handleSend}
         onStop={() => void useSessions.getState().interrupt(id)}

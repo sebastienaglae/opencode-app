@@ -7,11 +7,12 @@
     android:paddingTop="2dp"
     android:paddingBottom="2dp">
 
-    <View
+    <ImageView
         android:layout_width="6dp"
         android:layout_height="6dp"
         android:layout_marginEnd="6dp"
-        android:background="@drawable/widget_dot" />
+        android:src="@drawable/widget_dot"
+        android:contentDescription="@string/widget_app" />
 
     <TextView
         android:id="@+id/row_project"

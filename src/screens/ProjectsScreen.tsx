@@ -43,6 +43,7 @@ export default function ProjectsScreen() {
   const rows = useMemo(() => {
     const byProject = new Map<string, typeof list>();
     for (const s of list) {
+      if (s.parentID) continue; // sub-agent sessions belong to a parent
       const arr = byProject.get(s.projectID) ?? [];
       arr.push(s);
       byProject.set(s.projectID, arr);

@@ -46,6 +46,21 @@ public class SessionWidgetProvider extends AppWidgetProvider {
     }
 
     private static void update(Context context, AppWidgetManager manager, int id) {
+        RemoteViews views;
+        try {
+            views = build(context, manager, id);
+        } catch (Exception e) {
+            // Never let a RemoteViews failure make the widget unloadable.
+            views = new RemoteViews(context.getPackageName(), R.layout.session_widget);
+            views.setViewVisibility(R.id.widget_chronometer, View.GONE);
+            views.removeAllViews(R.id.widget_rows);
+            views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_app));
+            views.setTextViewText(R.id.widget_subtitle, "");
+        }
+        manager.updateAppWidget(id, views);
+    }
+
+    private static RemoteViews build(Context context, AppWidgetManager manager, int id) throws Exception {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         int running = prefs.getInt("running", 0);
         int finished = prefs.getInt("finished", 0);
@@ -83,25 +98,21 @@ public class SessionWidgetProvider extends AppWidgetProvider {
         } else {
             views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_running_many, running));
             SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            try {
-                JSONArray arr = new JSONArray(sessionsJson);
-                int shown = Math.min(arr.length(), maxRows);
-                for (int i = 0; i < shown; i++) {
-                    JSONObject o = arr.getJSONObject(i);
-                    RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
-                    row.setTextViewText(R.id.row_project, o.optString("project", ""));
-                    long st = o.optLong("startedAt", 0L);
-                    row.setTextViewText(R.id.row_time, st > 0 ? fmt.format(new Date(st)) : "");
-                    views.addView(R.id.widget_rows, row);
-                }
-                if (arr.length() > shown) {
-                    RemoteViews more = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
-                    more.setTextViewText(R.id.row_project, "+" + (arr.length() - shown));
-                    more.setTextViewText(R.id.row_time, "");
-                    views.addView(R.id.widget_rows, more);
-                }
-            } catch (Exception ignored) {
-                /* malformed sessions */
+            JSONArray arr = new JSONArray(sessionsJson);
+            int shown = Math.min(arr.length(), maxRows);
+            for (int i = 0; i < shown; i++) {
+                JSONObject o = arr.getJSONObject(i);
+                RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
+                row.setTextViewText(R.id.row_project, o.optString("project", ""));
+                long st = o.optLong("startedAt", 0L);
+                row.setTextViewText(R.id.row_time, st > 0 ? fmt.format(new Date(st)) : "");
+                views.addView(R.id.widget_rows, row);
+            }
+            if (arr.length() > shown) {
+                RemoteViews more = new RemoteViews(context.getPackageName(), R.layout.session_widget_row);
+                more.setTextViewText(R.id.row_project, "+" + (arr.length() - shown));
+                more.setTextViewText(R.id.row_time, "");
+                views.addView(R.id.widget_rows, more);
             }
             views.setTextViewText(R.id.widget_subtitle, context.getString(R.string.widget_finished, finished));
         }
@@ -116,8 +127,7 @@ public class SessionWidgetProvider extends AppWidgetProvider {
             );
             views.setOnClickPendingIntent(R.id.widget_root, pending);
         }
-
-        manager.updateAppWidget(id, views);
+        return views;
     }
 
     @Override

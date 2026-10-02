@@ -65,6 +65,9 @@ Android app ──HTTP + WebSocket──► companion bridge (Node) ──localh
 - **Constant-height header** ("OpenCode" + section) and **Android back-gesture** support.
 - **Prominent offline/unauthorized banner** everywhere, with a one-tap fix.
 - **Default model** picked from your last used model / recent sessions (never left empty).
+- **Draft persistence**: the composer text and attachments are saved per session, so a prompt
+  survives an app crash or close and can be resumed.
+- **Sub-agent sessions are hidden** from the project lists (they belong to a parent session).
 - **Performance**: only the latest messages load (older ones paginate on scroll-up), memoized
   message rendering, abortable requests, chunked diff rendering.
 

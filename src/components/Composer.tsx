@@ -7,6 +7,7 @@ import { api } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import type { PromptFileInput } from "../core/types";
 import { useConnection } from "../core/store/connection";
+import { useDrafts } from "../core/store/drafts";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
 
@@ -26,6 +27,7 @@ function fileToDataUrl(file: File): Promise<Attachment> {
 }
 
 export function Composer({
+  sessionID,
   running,
   onSend,
   onStop,
@@ -35,6 +37,7 @@ export function Composer({
   onOpenModel,
   onOpenAgent,
 }: {
+  sessionID: string;
   running: boolean;
   onSend: (text: string, files: PromptFileInput[]) => Promise<void> | void;
   onStop: () => void;
@@ -90,6 +93,20 @@ export function Composer({
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? "auto" : "hidden";
   }, [text]);
 
+  // Restore the persisted draft when switching sessions.
+  useEffect(() => {
+    const d = useDrafts.getState().drafts[sessionID];
+    setText(d?.text ?? "");
+    setAttachments(d?.attachments ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionID]);
+
+  // Persist the draft (debounced) so a prompt survives a crash/close.
+  useEffect(() => {
+    const timer = setTimeout(() => useDrafts.getState().save(sessionID, text, attachments), 400);
+    return () => clearTimeout(timer);
+  }, [sessionID, text, attachments]);
+
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
     const added: Attachment[] = [];
@@ -137,6 +154,7 @@ export function Composer({
       await onSend(trimmed, attachments.map((a) => ({ uri: a.uri, name: a.name, mime: a.mime })));
       setText("");
       setAttachments([]);
+      useDrafts.getState().clear(sessionID);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

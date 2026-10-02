@@ -540,6 +540,19 @@ Décisions prises suite au premier test sur téléphone :
 
 ---
 
+## 21. Septième passe (v0.9) — bruit des sous-agents, widget, brouillons, tray
+
+- **Sessions de sous-agents masquées** : les sessions avec `parentID` ne sont plus listées dans
+  les Projets / Sessions du projet (elles restent rattachées à leur parent ; le compteur d'agents
+  en cours reste affiché dans la conversation).
+- **Widget corrigé** : le point de statut passe de `<View>` à `ImageView` (RemoteViews refusait le
+  `<View>` → « impossible de charger le widget »).
+- **Persistance des brouillons** : `src/core/store/drafts.ts` — texte + pièces jointes (si petites)
+  par session, restaurés à l'ouverture, effacés à l'envoi. Survit à un crash/fermeture.
+- **Tray Windows** restylé (thème sombre, en-tête OpenCode, QR, token éditable + redémarrage).
+
+---
+
 ## 19. Cinquième passe (v0.7) — prévisualisation & chiffrement local
 
 - **Prévisualisation in-app** : `GET /servers` (le bridge sonde les ports de dev courants sur

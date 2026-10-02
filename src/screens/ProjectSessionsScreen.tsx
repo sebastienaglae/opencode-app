@@ -55,7 +55,7 @@ export default function ProjectSessionsScreen() {
   const sessions = useMemo(() => {
     const q = search.toLowerCase();
     return list
-      .filter((s) => s.projectID === id)
+      .filter((s) => s.projectID === id && !s.parentID)
       .filter((s) => !q || (s.title ?? "").toLowerCase().includes(q))
       .sort((a, b) => Number(isActive(b)) - Number(isActive(a)) || b.time.updated - a.time.updated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
