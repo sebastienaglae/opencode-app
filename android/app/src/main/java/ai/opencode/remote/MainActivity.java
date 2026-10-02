@@ -70,10 +70,11 @@ public class MainActivity extends BridgeActivity {
     private void injectInsets(WebView view) {
         if (view == null) return;
         String js =
-            "document.documentElement.style.setProperty('--safe-top','" + safeTop + "px');" +
-            "document.documentElement.style.setProperty('--safe-bottom','" + safeBottom + "px');" +
-            "document.documentElement.style.setProperty('--safe-left','" + safeLeft + "px');" +
-            "document.documentElement.style.setProperty('--safe-right','" + safeRight + "px');";
+            "(function(){var r=window.devicePixelRatio||1;" +
+            "document.documentElement.style.setProperty('--safe-top',(" + safeTop + "/r)+'px');" +
+            "document.documentElement.style.setProperty('--safe-bottom',(" + safeBottom + "/r)+'px');" +
+            "document.documentElement.style.setProperty('--safe-left',(" + safeLeft + "/r)+'px');" +
+            "document.documentElement.style.setProperty('--safe-right',(" + safeRight + "/r)+'px');})();";
         view.evaluateJavascript(js, null);
     }
 
