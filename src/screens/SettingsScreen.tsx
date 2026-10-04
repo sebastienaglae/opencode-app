@@ -8,7 +8,7 @@ import { DEFAULT_CANDIDATE_PORTS, useSettings, type ThemeMode } from "../core/st
 import { LANGUAGES, useT, type Lang } from "../core/i18n";
 import { cn } from "../core/cn";
 import { AppHeader } from "../components/AppHeader";
-import { scanQrFromCamera } from "../core/qrScan";
+import { QrScanner } from "../components/QrScanner";
 import { applyPairingLink } from "../core/pairing";
 import { toast } from "../core/store/toast";
 
@@ -132,6 +132,7 @@ export default function SettingsScreen() {
   const [port, setPort] = useState(String(settings.port));
   const [token, setToken] = useState(settings.token);
   const [ports, setPorts] = useState(settings.candidatePorts.join(", "));
+  const [scanOpen, setScanOpen] = useState(false);
 
   const save = () => {
     const parsedPorts = ports
@@ -146,23 +147,15 @@ export default function SettingsScreen() {
     });
   };
 
-  const onScan = async () => {
-    try {
-      const code = await scanQrFromCamera();
-      if (!code) {
-        toast.error(t("scan.noCode"));
-        return;
-      }
-      if (applyPairingLink(code)) {
-        const s = useSettings.getState();
-        setHost(s.host);
-        setPort(String(s.port));
-        setToken(s.token);
-        toast.success(t("toast.paired"));
-      } else {
-        toast.error(t("scan.error"));
-      }
-    } catch {
+  const onScanResult = (code: string) => {
+    setScanOpen(false);
+    if (applyPairingLink(code)) {
+      const s = useSettings.getState();
+      setHost(s.host);
+      setPort(String(s.port));
+      setToken(s.token);
+      toast.success(t("toast.paired"));
+    } else {
       toast.error(t("scan.error"));
     }
   };
@@ -195,7 +188,7 @@ export default function SettingsScreen() {
           </div>
           <button
             type="button"
-            onClick={() => void onScan()}
+            onClick={() => setScanOpen(true)}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-[14px] font-semibold text-fg"
           >
             <IonIcon icon={qrCodeOutline} className="text-[18px] text-accent" />
@@ -248,6 +241,7 @@ export default function SettingsScreen() {
 
         <div className="border-t border-border pt-4 text-[12px] text-faint">{t("settings.footer")}</div>
       </div>
+      <QrScanner open={scanOpen} onClose={() => setScanOpen(false)} onResult={onScanResult} />
     </div>
   );
 }
