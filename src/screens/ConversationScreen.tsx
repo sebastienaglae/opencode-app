@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { arrowBackOutline, arrowDownOutline, ellipsisHorizontal, stopCircleOutline } from "ionicons/icons";
+import { arrowBackOutline, arrowDownOutline, chevronForwardOutline, ellipsisHorizontal, peopleOutline, stopCircleOutline } from "ionicons/icons";
 import { api } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import { Capacitor } from "@capacitor/core";
@@ -15,7 +15,7 @@ import { useConnection } from "../core/store/connection";
 import { useSettings } from "../core/store/settings";
 import { useT } from "../core/i18n";
 import { cn } from "../core/cn";
-import { formatCost, formatDateTime, formatUsage } from "../core/format";
+import { formatCost, formatDateTime, formatRelative, formatUsage } from "../core/format";
 import { modelLabel } from "../core/models";
 import { toast } from "../core/store/toast";
 import { emptyTokens } from "../core/types";import type { ModelRef, PromptFileInput, SessionInfo } from "../core/types";
@@ -51,6 +51,7 @@ export default function ConversationScreen() {
   const [diffLimit, setDiffLimit] = useState(20);
   const [shellResult, setShellResult] = useState<{ command: string; output: string; status: string; exit?: number | string } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [subagentsOpen, setSubagentsOpen] = useState(false);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -82,6 +83,13 @@ export default function ConversationScreen() {
   const runningAgents = useMemo(
     () => sessionList.filter((s) => s.parentID === id && activeMap[s.id]),
     [sessionList, id, activeMap],
+  );
+  const childSessions = useMemo(
+    () =>
+      sessionList
+        .filter((s) => s.parentID === id)
+        .sort((a, b) => b.time.updated - a.time.updated),
+    [sessionList, id],
   );
 
   useEffect(() => {
@@ -341,6 +349,19 @@ export default function ConversationScreen() {
                 <IonIcon icon={stopCircleOutline} className="text-[20px]" />
               </button>
             )}
+            {childSessions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSubagentsOpen(true)}
+                className="relative p-1.5 text-muted active:text-fg"
+                aria-label={t("conv.subagents")}
+              >
+                <IonIcon icon={peopleOutline} className="text-[20px]" />
+                <span className="absolute -right-0.5 -top-0.5 rounded-full bg-accent px-1 text-[10px] font-bold text-white">
+                  {childSessions.length}
+                </span>
+              </button>
+            )}
             <ContextRing used={contextUsed} limit={contextLimit} onClick={() => setContextOpen(true)} />
             <button type="button" onClick={() => setMenuOpen(true)} className="p-1.5 text-muted active:text-fg" aria-label="menu">
               <IonIcon icon={ellipsisHorizontal} className="text-[20px]" />
@@ -462,6 +483,7 @@ export default function ConversationScreen() {
               setDiffOpen(true);
             },
           },
+          ...(childSessions.length > 0 ? [{ label: `${t("conv.subagents")} (${childSessions.length})`, onClick: () => setSubagentsOpen(true) }] : []),
           {
             label: t("conv.menu.fork"),
             onClick: () => void api.forkSession(id).then((s) => s && useSessions.getState().upsertSession(s)),
@@ -596,6 +618,39 @@ export default function ConversationScreen() {
           <div className="px-3 py-2.5 text-[12px] text-faint">
             {t("conv.input.placeholder")} · <span className="font-mono">!command</span>
           </div>
+        </div>
+      </Sheet>
+
+      <Sheet open={subagentsOpen} onClose={() => setSubagentsOpen(false)} title={t("conv.subagents")}>
+        <div className="flex flex-col p-2">
+          {childSessions.length === 0 ? (
+            <div className="p-6 text-center text-[13px] text-muted">{t("conv.subagents.empty")}</div>
+          ) : (
+            childSessions.map((child) => {
+              const running = Boolean(activeMap[child.id]) || Boolean(useSessions.getState().conversations[child.id]?.running);
+              return (
+                <button
+                  key={child.id}
+                  type="button"
+                  onClick={() => {
+                    setSubagentsOpen(false);
+                    navigate(`/session/${child.id}`);
+                  }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-left active:bg-surface2"
+                >
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", running ? "bg-success oc-pulse" : "bg-faint")} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] text-fg">{child.title || "—"}</span>
+                    <span className="block text-[11.5px] text-faint">
+                      {child.agent ? `${child.agent} · ` : ""}
+                      {running ? t("conv.subagents.running") : t("conv.subagents.done")} · {formatRelative(child.time.updated)}
+                    </span>
+                  </span>
+                  <IonIcon icon={chevronForwardOutline} className="text-[16px] text-faint" />
+                </button>
+              );
+            })
+          )}
         </div>
       </Sheet>
     </div>
