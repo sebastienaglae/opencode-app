@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { pushBackHandler } from "../core/backHandler";
 
 export function Sheet({
   open,
@@ -14,6 +16,15 @@ export function Sheet({
   children: ReactNode;
   maxHeight?: string;
 }) {
+  // Android back closes the sheet first.
+  useEffect(() => {
+    if (!open) return;
+    return pushBackHandler(() => {
+      onClose();
+      return true;
+    });
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (

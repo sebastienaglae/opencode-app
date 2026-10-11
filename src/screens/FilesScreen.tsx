@@ -7,6 +7,7 @@ import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
 import { useViewer } from "../core/navigation";
+import { pushBackHandler } from "../core/backHandler";
 import { CodeBlock } from "../components/CodeBlock";
 import { Sheet } from "../components/Sheet";
 import { AppHeader } from "../components/AppHeader";
@@ -74,6 +75,15 @@ export default function FilesScreen() {
   }, [sessions, projects, directory]);
 
   useEffect(() => setStack([undefined]), [directory]);
+
+  // Android back: go up one folder instead of leaving the screen.
+  useEffect(() => {
+    if (stack.length <= 1) return;
+    return pushBackHandler(() => {
+      setStack((s) => s.slice(0, -1));
+      return true;
+    });
+  }, [stack.length]);
 
   const pendingFile = useViewer((s) => s.pendingFile);
   const pendingDir = useViewer((s) => s.pendingDir);

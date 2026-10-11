@@ -10,6 +10,7 @@ import { useNotifications } from "./hooks/useNotifications";
 import { useSessionWidget } from "./hooks/useSessionWidget";
 import { setNavigator } from "./core/navigation";
 import { applyPairingLink } from "./core/pairing";
+import { runBackHandler } from "./core/backHandler";
 import { useT } from "./core/i18n";
 import { Toaster } from "./components/Toaster";
 import { ConnectionBanner } from "./components/ConnectionBanner";
@@ -74,6 +75,7 @@ export default function App() {
       if (isActive && useSettings.getState().hydrated) void useConnection.getState().connect();
     });
     const backSub = CapacitorApp.addListener("backButton", () => {
+      if (runBackHandler()) return;
       if (window.history.length > 1) window.history.back();
       else void CapacitorApp.exitApp();
     });

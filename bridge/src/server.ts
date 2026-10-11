@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
+import { networkInterfaces } from "node:os";
 import { resolve, sep } from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { OpenCodeClient, type OpenCodeInfo } from "./opencode.ts";
@@ -15,14 +16,26 @@ const ALLOW_HEADERS = "authorization, content-type, accept, x-requested-with";
 const ALLOW_METHODS = "GET, POST, PATCH, PUT, DELETE, OPTIONS";
 
 /** Common local dev-server ports probed for the in-app preview. */
-const DEV_PORTS = [3000, 3001, 3002, 4200, 4321, 5000, 5001, 5173, 5174, 7000, 8000, 8080, 8888, 9000, 1234, 1420, 4000, 6006];
+const DEV_PORTS = [3000, 3001, 3002, 4200, 4321, 5000, 5001, 5173, 5174, 7000, 8000, 8080, 8888, 9000, 1234, 1420, 4000, 6006, 4173, 8001, 8081, 9001];
 
+function lanIPv4(): string | null {
+  for (const infos of Object.values(networkInterfaces())) {
+    for (const info of infos ?? []) {
+      if (info.family === "IPv4" && !info.internal) return info.address;
+    }
+  }
+  return null;
+}
+
+/** Probes dev-server ports on the LAN address (i.e. reachable from outside,
+ *  not just bound to localhost). */
 async function probeDevServers(): Promise<Array<{ port: number; url: string }>> {
+  const host = lanIPv4() ?? "127.0.0.1";
   const results = await Promise.all(
     DEV_PORTS.map(async (port) => {
       try {
-        const res = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(700) });
-        if (res.status < 500) return { port, url: `http://127.0.0.1:${port}` };
+        const res = await fetch(`http://${host}:${port}/`, { signal: AbortSignal.timeout(800) });
+        if (res.status < 500) return { port, url: `http://${host}:${port}` };
       } catch {
         /* not reachable */
       }

@@ -5,6 +5,7 @@ import { closeOutline } from "ionicons/icons";
 import jsQR from "jsqr";
 import { Camera } from "@capacitor/camera";
 import { useT } from "../core/i18n";
+import { pushBackHandler } from "../core/backHandler";
 
 /** Full-screen real-time QR scanner (camera stream + jsQR). */
 export function QrScanner({
@@ -19,6 +20,15 @@ export function QrScanner({
   const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Android back closes the scanner.
+  useEffect(() => {
+    if (!open) return;
+    return pushBackHandler(() => {
+      onClose();
+      return true;
+    });
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;

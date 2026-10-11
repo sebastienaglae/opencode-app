@@ -17,7 +17,7 @@ export default function PreviewScreen() {
   const status = useConnection((s) => s.status);
   const settings = useSettings();
   const host = settings.host;
-  const scheme = settings.secure ? "https" : "http";
+  const [scheme, setScheme] = useState<"http" | "https">("http");
 
   const [port, setPort] = useState(params.get("port") ?? "");
   const [reloadKey, setReloadKey] = useState(0);
@@ -81,7 +81,14 @@ export default function PreviewScreen() {
       />
 
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <span className="shrink-0 font-mono text-[12px] text-faint">{scheme}://{host || "…"}:</span>
+        <button
+          type="button"
+          onClick={() => setScheme((s) => (s === "http" ? "https" : "http"))}
+          className="shrink-0 rounded-md border border-border bg-surface2 px-2 py-1 font-mono text-[12px] font-semibold text-accent"
+        >
+          {scheme}
+        </button>
+        <span className="shrink-0 font-mono text-[12px] text-faint">://{host || "…"}:</span>
         <input
           value={port}
           onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ""))}
