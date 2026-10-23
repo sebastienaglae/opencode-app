@@ -7,14 +7,23 @@ import { loadConfig, parseArgs } from "./config.ts";
 import { startBridge, type RunningBridge } from "./server.ts";
 import { ensureTls } from "./tls.ts";
 
+function addressRank(ip: string): number {
+  if (ip.startsWith("192.168.")) return 0;
+  if (ip.startsWith("10.")) return 1;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return 2;
+  return 5;
+}
+
 function localAddresses(): string[] {
   const out: string[] = [];
   for (const infos of Object.values(networkInterfaces())) {
     for (const info of infos ?? []) {
-      if (info.family === "IPv4" && !info.internal) out.push(info.address);
+      if (info.family === "IPv4" && !info.internal && !info.address.startsWith("169.254.")) {
+        out.push(info.address);
+      }
     }
   }
-  return out;
+  return out.sort((a, b) => addressRank(a) - addressRank(b));
 }
 
 async function main() {
