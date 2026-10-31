@@ -15,6 +15,8 @@ class EventStream {
   private handlers = new Set<EventHandler>();
   private statusHandlers = new Set<StatusHandler>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  private lastMessageAt = 0;
   private attempt = 0;
   private closedByUser = false;
   private status: EventStreamStatus = "idle";
@@ -27,6 +29,7 @@ class EventStream {
     }
     this.url = url;
     this.closedByUser = false;
+    this.startWatchdog();
     this.open();
   }
 
@@ -35,9 +38,46 @@ class EventStream {
     this.url = null;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.stopWatchdog();
     this.ws?.close();
     this.ws = null;
     this.setStatus("idle");
+  }
+
+  /** A phone that sleeps or roams can keep a WebSocket in OPEN state while it
+   *  is already dead. The bridge pings every 25s; silence for 70s means the
+   *  socket must be replaced. */
+  private startWatchdog(): void {
+    if (this.watchdog) return;
+    this.watchdog = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      if (Date.now() - this.lastMessageAt < 70_000) return;
+      this.dropSocket();
+    }, 20_000);
+  }
+
+  private stopWatchdog(): void {
+    if (!this.watchdog) return;
+    clearInterval(this.watchdog);
+    this.watchdog = null;
+  }
+
+  private dropSocket(): void {
+    const dead = this.ws;
+    this.ws = null;
+    if (dead) {
+      dead.onopen = null;
+      dead.onmessage = null;
+      dead.onclose = null;
+      dead.onerror = null;
+      try {
+        dead.close();
+      } catch {
+        /* already gone */
+      }
+    }
+    this.setStatus("closed");
+    this.scheduleReconnect();
   }
 
   onEvent(cb: EventHandler): () => void {
@@ -74,10 +114,12 @@ class EventStream {
 
     ws.onopen = () => {
       this.attempt = 0;
+      this.lastMessageAt = Date.now();
       this.setStatus("open");
     };
 
     ws.onmessage = (ev) => {
+      this.lastMessageAt = Date.now();
       let msg: { kind?: string; event?: OpenCodeEvent; level?: string; message?: string };
       try {
         msg = JSON.parse(typeof ev.data === "string" ? ev.data : "");

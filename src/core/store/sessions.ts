@@ -88,6 +88,8 @@ type SessionsState = {
   replyForm: (id: string, formID: string, answer: Record<string, unknown>) => Promise<void>;
   replyPermission: (id: string, requestID: string, decision: PermissionReply) => Promise<void>;
 
+  /** Re-read the sessions and every loaded conversation after a reconnect. */
+  resync: () => Promise<void>;
   applyEvent: (event: OpenCodeEvent) => void;
 };
 
@@ -419,10 +421,44 @@ export const useSessions = create<SessionsState>((set, get) => {
       withConv(id, (c) => ({ ...c, permissions: c.permissions.filter((p) => p.id !== requestID) }));
     },
 
+    resync: async () => {
+      const ids = Object.keys(get().conversations);
+      if (ids.length === 0) {
+        await get().loadSessions().catch(() => undefined);
+        return;
+      }
+      await get().loadSessions().catch(() => undefined);
+      let active: Record<string, { type: string }> | null = null;
+      try {
+        active = await api.activeSessions();
+      } catch {
+        /* transient: keep event-driven state */
+      }
+      await Promise.all(
+        ids.map(async (id) => {
+          if (!get().conversations[id]) return;
+          await get().mergeRecent(id);
+          await get().refreshInbox(id);
+          if (!active) return;
+          const on = Boolean(active[id]);
+          withConv(id, (c) =>
+            c.running === on ? c : { ...c, running: on, status: on ? { type: "busy" } : { type: "idle" } },
+          );
+        }),
+      );
+    },
+
     applyEvent: (event) => {
       const t = event.type;
       const d = (event.data ?? {}) as Record<string, any>;
       const sid: string | undefined = d.sessionID;
+
+      // The bridge sends this synthetic event on every (re)connection: events
+      // missed while the socket was down must be recovered over REST.
+      if (t === "server.connected") {
+        void get().resync();
+        return;
+      }
 
       if (t === "session.created") {
         void get().loadSessions();

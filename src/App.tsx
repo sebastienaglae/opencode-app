@@ -5,6 +5,7 @@ import { HashRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate 
 import { chatbubblesOutline, cubeOutline, folderOutline, settingsOutline, terminalOutline } from "ionicons/icons";
 
 import { useConnection } from "./core/store/connection";
+import { useSessions } from "./core/store/sessions";
 import { useSettings } from "./core/store/settings";
 import { useNotifications } from "./hooks/useNotifications";
 import { useSessionWidget } from "./hooks/useSessionWidget";
@@ -72,7 +73,12 @@ export default function App() {
   useEffect(() => {
     void useConnection.getState().connect();
     const sub = CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive && useSettings.getState().hydrated) void useConnection.getState().connect();
+      if (isActive && useSettings.getState().hydrated) {
+        void useConnection.getState().connect();
+        // Events are live-only: after a sleep/network change, refetch so the
+        // open conversation catches up without navigating away and back.
+        void useSessions.getState().resync();
+      }
     });
     const backSub = CapacitorApp.addListener("backButton", () => {
       if (runBackHandler()) return;
