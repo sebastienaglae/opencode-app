@@ -3,8 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { arrowBackOutline, arrowDownOutline, chevronForwardOutline, ellipsisHorizontal, peopleOutline, stopCircleOutline } from "ionicons/icons";
-import { api } from "../core/api/opencode";
+import {
+  arrowBackOutline,
+  arrowDownOutline,
+  chevronForwardOutline,
+  closeCircle,
+  ellipsisHorizontal,
+  flagOutline,
+  layersOutline,
+  peopleOutline,
+  stopCircleOutline,
+} from "ionicons/icons";
+import { api, ApiError } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
@@ -52,6 +62,9 @@ export default function ConversationScreen() {
   const [shellResult, setShellResult] = useState<{ command: string; output: string; status: string; exit?: number | string } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+  const [goalOpen, setGoalOpen] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
+  const [goalUnsupported, setGoalUnsupported] = useState(false);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -102,14 +115,40 @@ export default function ConversationScreen() {
     enabled: diffOpen && status === "connected",
   });
 
+  // Session goal (/goal, OpenCode 2.2+). Read through the goal plugin's RPC;
+  // older servers answer 404 and the goal UI stays hidden.
+  const { data: goal = null, refetch: refetchGoal } = useQuery({
+    queryKey: ["goal", id],
+    queryFn: async () => {
+      try {
+        const res = await api.goal(id!);
+        return res?.output ?? null;
+      } catch (err) {
+        if (err instanceof ApiError && [400, 404, 405, 500, 501].includes(err.status)) setGoalUnsupported(true);
+        return null;
+      }
+    },
+    enabled: status === "connected" && Boolean(id) && !goalUnsupported,
+    retry: false,
+    refetchInterval: (query) => (query.state.data?.status === "active" ? 5000 : 20_000),
+  });
+
   useEffect(() => {
     if (!id) return;
     initialScrolled.current = false;
     useSessions.getState().ensureConversation(id);
     void useSessions.getState().loadMessages(id);
+    void useSessions.getState().refreshInbox(id);
     if (useSessions.getState().list.length === 0) void useSessions.getState().loadSessions();
     return () => useSessions.getState().abortLoad(id);
   }, [id]);
+
+  // Stacked prompts are drained by the server as steps finish: keep the queue fresh.
+  useEffect(() => {
+    if (!id || !conv?.running) return;
+    const timer = setInterval(() => void useSessions.getState().refreshInbox(id), 4000);
+    return () => clearInterval(timer);
+  }, [id, conv?.running]);
 
   useEffect(() => {
     setProjectDir(session?.location?.directory);
@@ -236,7 +275,7 @@ export default function ConversationScreen() {
     [id, session?.location?.directory],
   );
 
-  const handleSend = async (text: string, files: PromptFileInput[]) => {
+  const handleSend = async (text: string, files: PromptFileInput[], delivery?: "queue" | "steer") => {
     const trimmed = text.trim();
     if (!id) return;
     const match = /^\/([\w-]+)\s*([\s\S]*)$/.exec(trimmed);
@@ -324,7 +363,21 @@ export default function ConversationScreen() {
         return;
       }
     }
-    await useSessions.getState().sendPrompt(id, text, files, session?.agent);
+    await useSessions.getState().sendPrompt(id, text, files, session?.agent, delivery);
+  };
+
+  // `/goal <objective>` is a server-side command (OpenCode 2.2+). It runs through
+  // the same command endpoint as the TUI/Desktop, so pause/resume/clear work too.
+  const runGoal = async (text: string, successKey: string) => {
+    if (!id) return;
+    try {
+      await api.runCommand(id, { name: "goal", text });
+      toast.success(t(successKey));
+      setTimeout(() => void refetchGoal(), 700);
+    } catch (err) {
+      if (err instanceof ApiError && [400, 404, 405].includes(err.status)) setGoalUnsupported(true);
+      toast.error(t("toast.error", { message: err instanceof Error ? err.message : String(err) }));
+    }
   };
 
   if (!id) return null;
@@ -437,6 +490,80 @@ export default function ConversationScreen() {
         </AnimatePresence>
       </div>
 
+      {(goal || (conv?.inbox.length ?? 0) > 0) && (
+        <div className="flex flex-col gap-1.5 border-t border-border bg-bg px-3 pt-2">
+          {goal && (
+            <button
+              type="button"
+              onClick={() => setGoalOpen(true)}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left",
+                goal.status === "paused"
+                  ? "border-warning/40 bg-warning/10"
+                  : goal.status === "complete"
+                    ? "border-success/40 bg-success/10"
+                    : "border-border bg-surface2",
+              )}
+            >
+              <IonIcon
+                icon={flagOutline}
+                className={cn(
+                  "shrink-0 text-[15px]",
+                  goal.status === "paused" ? "text-warning" : goal.status === "complete" ? "text-success" : "text-accent",
+                )}
+              />
+              <span className="shrink-0 text-[12px] font-semibold text-fg">{t(`goal.pill.${goal.status}`)}</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{goal.objective}</span>
+              {goal.status === "active" && (
+                <span className="shrink-0 font-mono text-[10.5px] text-faint">
+                  {goal.rounds}/{goal.maxRounds}
+                </span>
+              )}
+            </button>
+          )}
+
+          {(conv?.inbox.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-border bg-surface2 px-2 py-1.5">
+              <div className="flex items-center gap-1.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+                <IonIcon icon={layersOutline} className="text-[12px]" />
+                {t("conv.queue.title", { count: conv?.inbox.length ?? 0 })}
+              </div>
+              <div className="flex flex-col gap-1">
+                {conv?.inbox.map((item) => (
+                  <div key={item.id} className="flex items-center gap-1.5 rounded-lg bg-bg px-2 py-1">
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg">
+                      {item.payload?.text || item.payload?.description || item.type}
+                    </span>
+                    {item.type === "user" && item.delivery === "queue" && (
+                      <button
+                        type="button"
+                        onClick={() => void useSessions.getState().setInboxDelivery(id, item.id, "steer")}
+                        className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10.5px] text-accent"
+                      >
+                        {t("conv.queue.steer")}
+                      </button>
+                    )}
+                    {item.delivery === "steer" && (
+                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10.5px] text-accent">
+                        {t("conv.delivery.steer")}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void useSessions.getState().cancelInbox(id, item.id)}
+                      aria-label={t("conv.queue.cancel")}
+                      className="shrink-0 text-[15px] text-faint active:text-danger"
+                    >
+                      <IonIcon icon={closeCircle} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <Composer
         sessionID={id}
         running={Boolean(conv?.running)}
@@ -482,6 +609,10 @@ export default function ConversationScreen() {
               setDiffLimit(20);
               setDiffOpen(true);
             },
+          },
+          {
+            label: goal ? t(`goal.pill.${goal.status}`) : t("goal.title"),
+            onClick: () => setGoalOpen(true),
           },
           ...(childSessions.length > 0 ? [{ label: `${t("conv.subagents")} (${childSessions.length})`, onClick: () => setSubagentsOpen(true) }] : []),
           {
@@ -650,6 +781,96 @@ export default function ConversationScreen() {
                 </button>
               );
             })
+          )}
+        </div>
+      </Sheet>
+
+      <Sheet open={goalOpen} onClose={() => setGoalOpen(false)} title={t("goal.title")}>
+        <div className="flex flex-col gap-3 p-3">
+          {goal ? (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                    goal.status === "paused"
+                      ? "bg-warning/15 text-warning"
+                      : goal.status === "complete"
+                        ? "bg-success/15 text-success"
+                        : "bg-accent/15 text-accent",
+                  )}
+                >
+                  {t(`goal.pill.${goal.status}`)}
+                </span>
+                <span className="text-[11.5px] text-faint">
+                  {t("goal.rounds", { rounds: goal.rounds, max: goal.maxRounds })}
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap text-[14px] leading-6 text-fg">{goal.objective}</p>
+              {goal.reason && (
+                <div className="rounded-lg border border-border bg-surface2 px-2.5 py-2 text-[12.5px] text-muted">
+                  <span className="block pb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+                    {t("goal.reason")}
+                  </span>
+                  {goal.reason}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {goal.status === "active" ? (
+                  <button
+                    type="button"
+                    onClick={() => void runGoal("pause", "goal.paused")}
+                    className="rounded-lg border border-border bg-surface2 px-3 py-2 text-[13px] font-medium text-fg active:bg-surface"
+                  >
+                    {t("goal.pause")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void runGoal("resume", "goal.resumed")}
+                    className="rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white active:opacity-90"
+                  >
+                    {t("goal.resume")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void runGoal("clear", "goal.cleared")}
+                  className="rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-danger active:bg-surface2"
+                >
+                  {t("goal.clear")}
+                </button>
+              </div>
+            </>
+          ) : goalUnsupported ? (
+            <div className="p-4 text-center text-[13px] text-muted">{t("goal.unsupported")}</div>
+          ) : (
+            <>
+              <p className="text-[12.5px] text-muted">{t("goal.hint")}</p>
+              <textarea
+                value={goalDraft}
+                onChange={(e) => setGoalDraft(e.target.value)}
+                rows={4}
+                maxLength={4000}
+                placeholder={t("goal.placeholder")}
+                className="w-full resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-[14px] leading-6 text-fg outline-none placeholder:text-faint focus:border-borderstrong"
+              />
+              <button
+                type="button"
+                disabled={!goalDraft.trim()}
+                onClick={() => {
+                  void runGoal(goalDraft.trim(), "goal.started");
+                  setGoalDraft("");
+                  setGoalOpen(false);
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-2.5 text-[14px] font-semibold",
+                  goalDraft.trim() ? "bg-accent text-white active:opacity-90" : "bg-surface2 text-faint",
+                )}
+              >
+                {t("goal.start")}
+              </button>
+            </>
           )}
         </div>
       </Sheet>

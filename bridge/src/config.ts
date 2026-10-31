@@ -159,8 +159,12 @@ const DEFAULT_CONFIG_FILE = join(homedir(), ".opencode-remote", "config.json");
 export function loadConfig(opts: CliOptions): BridgeConfig {
   const configFile = opts.configFile ?? DEFAULT_CONFIG_FILE;
   const persisted = readJson<{ token?: string }>(configFile) ?? {};
+  // Last resort before generating a new secret: the token the previous run
+  // published to state.json. Restarting the bridge must never invalidate the
+  // pairing already stored on the phone.
+  const previous = readJson<{ token?: string }>(join(dirname(configFile), "state.json")) ?? {};
 
-  const token = opts.token ?? persisted.token ?? randomBytes(32).toString("base64url");
+  const token = opts.token ?? persisted.token ?? previous.token ?? randomBytes(32).toString("base64url");
   if (!persisted.token || opts.token) {
     try {
       mkdirSync(dirname(configFile), { recursive: true });

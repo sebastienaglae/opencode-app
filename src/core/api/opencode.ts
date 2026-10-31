@@ -23,6 +23,9 @@ import type {
   PromptFileInput,
   ShellInfo,
   ShellOutput,
+  InboxDelivery,
+  InboxItem,
+  SessionGoal,
 } from "../types";
 
 export class ApiError extends Error {
@@ -142,7 +145,23 @@ export const api = {
   sessionDiff: (id: string, params: { from?: string; to?: string; context?: number } = {}) =>
     request<FileDiff[]>(`/api/session/${id}/diff${qs(params)}`),
 
-  sessionInbox: (id: string) => request<unknown[]>(`/api/session/${id}/inbox`),
+  sessionInbox: (id: string) => request<InboxItem[]>(`/api/session/${id}/inbox`),
+
+  cancelInbox: (id: string, inboxID: string) =>
+    request<void>(`/api/session/${id}/inbox/${inboxID}`, { method: "DELETE" }),
+
+  setInboxDelivery: (id: string, inboxID: string, delivery: InboxDelivery) =>
+    request<void>(`/api/session/${id}/inbox/${inboxID}`, {
+      method: "PATCH",
+      body: JSON.stringify({ delivery }),
+    }),
+
+  /** Session goal status (OpenCode 2.2+). Throws ApiError 404 on older servers. */
+  goal: (sessionID: string) =>
+    request<{ output: SessionGoal | null }>("/api/rpc/opencode.goal/get", {
+      method: "POST",
+      body: JSON.stringify({ input: { sessionID } }),
+    }),
 
   // --- messages & prompts ---------------------------------------------------
   listMessages: (id: string, params: { limit?: number; order?: "asc" | "desc"; cursor?: string } = {}, signal?: AbortSignal) =>

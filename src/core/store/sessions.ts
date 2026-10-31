@@ -7,6 +7,8 @@ import type {
   AssistantPart,
   FormInfo,
   MessageInfo,
+  InboxDelivery,
+  InboxItem,
   ModelRef,
   OpenCodeEvent,
   PermissionReply,
@@ -28,6 +30,8 @@ export type Conversation = {
   parts: Record<string, AssistantPart[]>;
   forms: FormInfo[];
   permissions: PermissionRequest[];
+  /** Prompts stacked on the server, waiting for the current turn to end. */
+  inbox: InboxItem[];
   status: SessionStatus;
   running: boolean;
   cost: number;
@@ -46,6 +50,7 @@ const newConversation = (id: string): Conversation => ({
   parts: {},
   forms: [],
   permissions: [],
+  inbox: [],
   status: { type: "idle" },
   running: false,
   cost: 0,
@@ -75,7 +80,10 @@ type SessionsState = {
   loadOlder: (id: string) => Promise<void>;
   mergeRecent: (id: string) => Promise<void>;
   abortLoad: (id: string) => void;
-  sendPrompt: (id: string, text: string, files?: PromptFileInput[], agent?: string) => Promise<void>;
+  sendPrompt: (id: string, text: string, files?: PromptFileInput[], agent?: string, delivery?: InboxDelivery) => Promise<void>;
+  refreshInbox: (id: string) => Promise<void>;
+  cancelInbox: (id: string, inboxID: string) => Promise<void>;
+  setInboxDelivery: (id: string, inboxID: string, delivery: InboxDelivery) => Promise<void>;
   interrupt: (id: string) => Promise<void>;
   replyForm: (id: string, formID: string, answer: Record<string, unknown>) => Promise<void>;
   replyPermission: (id: string, requestID: string, decision: PermissionReply) => Promise<void>;
@@ -330,8 +338,9 @@ export const useSessions = create<SessionsState>((set, get) => {
       }
     },
 
-    sendPrompt: async (id, text, files, agent) => {
+    sendPrompt: async (id, text, files, agent, delivery) => {
       get().ensureConversation(id);
+      const queued = delivery === "queue" && Boolean(get().conversations[id]?.running);
       const optimistic: MessageInfo = {
         type: "user",
         id: `msg_local_${crypto.randomUUID()}`,
@@ -339,17 +348,56 @@ export const useSessions = create<SessionsState>((set, get) => {
         text,
         files: files?.map((f) => ({ name: f.name, mime: f.mime })),
       };
-      withConv(id, (c) => ({ ...c, messages: [...c.messages, optimistic], running: true, status: { type: "busy" } }));
+      // A stacked prompt is only delivered after the running turn, so it must not
+      // appear in the transcript yet: the server inbox row is the visible trace.
+      withConv(id, (c) => ({
+        ...c,
+        running: queued ? c.running : true,
+        status: queued ? c.status : { type: "busy" },
+        messages: queued ? c.messages : [...c.messages, optimistic],
+      }));
       try {
-        await api.prompt(id, { text, files, agent, delivery: "steer" });
+        await api.prompt(id, { text, files, agent, delivery });
+        if (queued) await get().refreshInbox(id);
       } catch (err) {
         withConv(id, (c) => ({
           ...c,
-          running: false,
+          running: queued ? c.running : false,
+          status: queued ? c.status : { type: "idle" },
           error: err instanceof Error ? err.message : String(err),
-          messages: c.messages.filter((m) => m.id !== optimistic.id),
+          messages: queued ? c.messages : c.messages.filter((m) => m.id !== optimistic.id),
         }));
         throw err;
+      }
+    },
+
+    refreshInbox: async (id) => {
+      try {
+        const inbox = await api.sessionInbox(id);
+        withConv(id, (c) => ({ ...c, inbox: Array.isArray(inbox) ? inbox : [] }));
+      } catch {
+        /* older servers or transient errors: keep the last known queue */
+      }
+    },
+
+    cancelInbox: async (id, inboxID) => {
+      withConv(id, (c) => ({ ...c, inbox: c.inbox.filter((i) => i.id !== inboxID) }));
+      try {
+        await api.cancelInbox(id, inboxID);
+      } finally {
+        await get().refreshInbox(id);
+      }
+    },
+
+    setInboxDelivery: async (id, inboxID, delivery) => {
+      withConv(id, (c) => ({
+        ...c,
+        inbox: c.inbox.map((i) => (i.id === inboxID ? { ...i, delivery } : i)),
+      }));
+      try {
+        await api.setInboxDelivery(id, inboxID, delivery);
+      } finally {
+        await get().refreshInbox(id);
       }
     },
 
@@ -418,6 +466,7 @@ export const useSessions = create<SessionsState>((set, get) => {
         case "session.idle": {
           withConv(sid, (c) => ({ ...c, status: { type: "idle" }, running: false }));
           void get().mergeRecent(sid);
+          void get().refreshInbox(sid);
           return;
         }
         case "session.execution.started":
@@ -428,15 +477,18 @@ export const useSessions = create<SessionsState>((set, get) => {
             if (mid) next = ensureAssistantMessage(next, mid, { created: d.started, agent: d.agent, model: d.model });
             return next;
           });
+          void get().refreshInbox(sid);
           return;
         }
         case "session.execution.failed": {
           withConv(sid, (c) => ({ ...c, running: false, status: { type: "idle" }, error: d.error?.message }));
+          void get().refreshInbox(sid);
           return;
         }
         case "session.execution.interrupted":
         case "session.execution.succeeded": {
           withConv(sid, (c) => ({ ...c, running: false, status: { type: "idle" } }));
+          void get().refreshInbox(sid);
           return;
         }
         case "session.step.ended": {

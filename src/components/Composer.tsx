@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
-import { addOutline, cameraOutline, closeCircle, paperPlaneOutline, stopCircleOutline } from "ionicons/icons";
+import {
+  addOutline,
+  cameraOutline,
+  closeCircle,
+  layersOutline,
+  micOutline,
+  paperPlaneOutline,
+  returnDownForwardOutline,
+  stopCircleOutline,
+} from "ionicons/icons";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { api } from "../core/api/opencode";
 import { BUILTIN_COMMANDS } from "../core/builtinCommands";
-import type { PromptFileInput } from "../core/types";
+import type { InboxDelivery, PromptFileInput } from "../core/types";
 import { useConnection } from "../core/store/connection";
 import { useDrafts } from "../core/store/drafts";
+import { useSettings } from "../core/store/settings";
 import { useT } from "../core/i18n";
+import { speechAvailable, speechLanguage, startDictation, type Dictation } from "../core/speech";
 import { cn } from "../core/cn";
 
 export type Attachment = { name: string; mime: string; uri: string; size: number };
@@ -39,7 +50,7 @@ export function Composer({
 }: {
   sessionID: string;
   running: boolean;
-  onSend: (text: string, files: PromptFileInput[]) => Promise<void> | void;
+  onSend: (text: string, files: PromptFileInput[], delivery?: InboxDelivery) => Promise<void> | void;
   onStop: () => void;
   onShell?: (command: string) => void;
   modelLabel?: string;
@@ -52,9 +63,14 @@ export function Composer({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [delivery, setDelivery] = useState<InboxDelivery>("queue");
+  const dictation = useRef<Dictation | null>(null);
+  const dictationBase = useRef("");
   const fileInput = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const status = useConnection((s) => s.status);
+  const lang = useSettings((s) => s.lang);
 
   const { data: commands = [] } = useQuery({
     queryKey: ["commands"],
@@ -139,19 +155,73 @@ export function Composer({
     }
   };
 
+  const stopDictation = (discard = false) => {
+    const active = dictation.current;
+    dictation.current = null;
+    setListening(false);
+    if (!active) return;
+    if (discard) active.cancel();
+    else active.stop();
+  };
+
+  // Never leave the microphone running when the screen unmounts.
+  useEffect(() => () => stopDictation(true), []);
+
+  const toggleDictation = async () => {
+    if (listening) {
+      stopDictation();
+      return;
+    }
+    setError(null);
+    if (!(await speechAvailable())) {
+      setError(t("conv.dictate.unavailable"));
+      return;
+    }
+    dictationBase.current = text.trim() ? `${text.trimEnd()} ` : "";
+    setListening(true);
+    try {
+      dictation.current = await startDictation(
+        {
+          onPartial: (part) => setText(`${dictationBase.current}${part}`),
+          onResult: (final) => {
+            setText(`${dictationBase.current}${final}`.trimStart());
+            stopDictation();
+          },
+          onState: (on) => {
+            if (!on) setListening(false);
+          },
+          onError: (message) => {
+            setListening(false);
+            setError(t("conv.dictate.error", { message }));
+          },
+        },
+        { language: speechLanguage(lang) },
+      );
+    } catch (err) {
+      setListening(false);
+      setError(t("conv.dictate.error", { message: err instanceof Error ? err.message : String(err) }));
+    }
+  };
+
   const submit = async () => {
     const trimmed = text.trim();
     if (sending) return;
     if (trimmed.startsWith("!") && trimmed.length > 1) {
+      stopDictation();
       onShell?.(trimmed.slice(1).trim());
       setText("");
       return;
     }
     if ((!trimmed && attachments.length === 0)) return;
+    if (listening) stopDictation();
     setSending(true);
     setError(null);
     try {
-      await onSend(trimmed, attachments.map((a) => ({ uri: a.uri, name: a.name, mime: a.mime })));
+      await onSend(
+        trimmed,
+        attachments.map((a) => ({ uri: a.uri, name: a.name, mime: a.mime })),
+        running ? delivery : undefined,
+      );
       setText("");
       setAttachments([]);
       useDrafts.getState().clear(sessionID);
@@ -203,6 +273,38 @@ export function Composer({
 
       {error && <div className="pb-1.5 text-[12px] text-danger">{error}</div>}
 
+      {running && (
+        <div className="mb-1.5 flex items-center gap-2 px-0.5">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-faint">{t("conv.delivery")}</span>
+          <div className="flex rounded-full border border-border bg-surface2 p-0.5">
+            <button
+              type="button"
+              onClick={() => setDelivery("queue")}
+              title={t("conv.delivery.queue.hint")}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                delivery === "queue" ? "bg-bg text-fg" : "text-muted",
+              )}
+            >
+              <IonIcon icon={layersOutline} className="text-[12px]" />
+              {t("conv.delivery.queue")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDelivery("steer")}
+              title={t("conv.delivery.steer.hint")}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                delivery === "steer" ? "bg-bg text-accent" : "text-muted",
+              )}
+            >
+              <IonIcon icon={returnDownForwardOutline} className="text-[12px]" />
+              {t("conv.delivery.steer")}
+            </button>
+          </div>
+        </div>
+      )}
+
       <textarea
         ref={taRef}
         rows={1}
@@ -225,6 +327,12 @@ export function Composer({
         />
         <IconBtn onClick={() => fileInput.current?.click()} label={t("conv.attach")} icon={addOutline} />
         <IconBtn onClick={pickCamera} label={t("conv.camera")} icon={cameraOutline} />
+        <IconBtn
+          onClick={() => void toggleDictation()}
+          label={listening ? t("conv.dictate.stop") : t("conv.dictate")}
+          icon={micOutline}
+          className={listening ? "bg-danger/15 text-danger oc-pulse" : undefined}
+        />
         {modelLabel !== undefined && (
           <button
             type="button"

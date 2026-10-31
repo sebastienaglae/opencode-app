@@ -37,11 +37,38 @@ function Get-BridgeProcess {
         Where-Object { $_.CommandLine -like '*src/index.ts*' }
 }
 
+function Get-Token {
+    # The token must survive every tray/bridge restart: config.json first, then
+    # state.json (what the last running bridge published), never a fresh random one.
+    if (Test-Path $ConfigFile) {
+        try {
+            $cfg = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+            if ($cfg.token) { return [string]$cfg.token }
+        } catch { }
+    }
+    $s = Get-State
+    if ($s -and $s.token) { return [string]$s.token }
+    return $null
+}
+
 function Start-Bridge {
     param([switch]$Tls)
     if (Get-BridgeProcess) { return }
+    $state = Get-State
+    $token = Get-Token
+    if ($token -and -not (Test-Path $ConfigFile)) {
+        try {
+            Set-Content -Path $ConfigFile -Value (@{ token = $token } | ConvertTo-Json -Compress) -Encoding ascii -NoNewline
+        } catch { }
+    }
+    # Keep the transport the app was paired with unless the caller forces -Tls.
+    if (-not $PSBoundParameters.ContainsKey('Tls')) {
+        $Tls = [bool]($state -and $state.tls)
+    }
     $arguments = @('src/index.ts')
     if ($Tls) { $arguments += '--tls' }
+    if ($token) { $arguments += @('--token', $token) }
+    $arguments += @('--config-file', $ConfigFile)
     Start-Process -FilePath 'node' -ArgumentList $arguments -WorkingDirectory $BridgeDir -WindowStyle Hidden
     Start-Sleep -Seconds 2
 }
@@ -156,10 +183,10 @@ function Show-Panel {
         $form.Controls.Add($empty)
     }
 
-    $restart = New-Button 'Demarrer / redemarrer le bridge' $false
+    $restart = New-Button 'Redemarrer le bridge (token conserve)' $false
     $restart.Location = New-Object System.Drawing.Point(16, 576)
     $restart.Size = New-Object System.Drawing.Size(408, 36)
-    $restart.Add_Click({ Stop-Bridge; Start-Bridge; [System.Windows.Forms.MessageBox]::Show('Bridge (re)demarre.') })
+    $restart.Add_Click({ Stop-Bridge; Start-Bridge; [System.Windows.Forms.MessageBox]::Show('Bridge redemarre. Le token et le mode TLS sont conserves.') })
     $form.Controls.Add($restart)
 
     [void]$form.ShowDialog()

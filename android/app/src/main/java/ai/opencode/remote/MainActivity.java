@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SessionWidgetPlugin.class);
+        registerPlugin(SpeechPlugin.class);
         super.onCreate(savedInstanceState);
 
         final Bridge bridge = getBridge();

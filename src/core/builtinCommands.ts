@@ -23,5 +23,6 @@ export const BUILTIN_COMMANDS: BuiltinCommand[] = [
   { name: "agents", descKey: "cmd.agents" },
   { name: "skills", descKey: "cmd.skills" },
   { name: "share", descKey: "cmd.share" },
+  { name: "goal", descKey: "cmd.goal", server: true },
   { name: "help", descKey: "cmd.help" },
 ];

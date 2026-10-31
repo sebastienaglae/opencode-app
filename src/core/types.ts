@@ -304,3 +304,36 @@ export type PromptFileInput = {
   description?: string;
   mime?: string;
 };
+
+// --- Prompt stacking (session inbox) ---------------------------------------
+
+export type InboxDelivery = "steer" | "queue";
+
+/** A prompt the server holds until the running turn finishes ("stacked"). */
+export type InboxItem = {
+  id: string;
+  sessionID: string;
+  type: "user" | "synthetic" | "compaction" | "move";
+  time: { created: number };
+  delivery: InboxDelivery;
+  payload?: {
+    text?: string;
+    description?: string;
+    files?: Array<{ name?: string; mime?: string }>;
+  };
+};
+
+// --- Session goal (/goal, OpenCode 2.2+) -----------------------------------
+
+export type GoalStatus = "active" | "paused" | "complete";
+
+export type SessionGoal = {
+  id: string;
+  objective: string;
+  status: GoalStatus;
+  reason?: string;
+  rounds: number;
+  maxRounds: number;
+  stalls?: number;
+  updatedAt: number;
+};
