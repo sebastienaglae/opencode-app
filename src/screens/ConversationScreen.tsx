@@ -124,7 +124,7 @@ export default function ConversationScreen() {
         const res = await api.goal(id!);
         return res?.output ?? null;
       } catch (err) {
-        if (err instanceof ApiError && [400, 404, 405, 500, 501].includes(err.status)) setGoalUnsupported(true);
+        if (err instanceof ApiError && [400, 404, 405, 501].includes(err.status)) setGoalUnsupported(true);
         return null;
       }
     },

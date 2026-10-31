@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { IonIcon, IonSpinner } from "@ionic/react";
 import { useQuery } from "@tanstack/react-query";
-import { arrowBackOutline, chevronForwardOutline, documentOutline, folderOutline, swapHorizontalOutline } from "ionicons/icons";
+import {
+  arrowBackOutline,
+  chevronForwardOutline,
+  documentOutline,
+  downloadOutline,
+  folderOutline,
+  openOutline,
+  swapHorizontalOutline,
+} from "ionicons/icons";
 import { api } from "../core/api/opencode";
+import { openSaved, saveFile } from "../core/download";
 import { useSessions } from "../core/store/sessions";
 import { useConnection } from "../core/store/connection";
 import { useT } from "../core/i18n";
@@ -11,6 +20,7 @@ import { pushBackHandler } from "../core/backHandler";
 import { CodeBlock } from "../components/CodeBlock";
 import { Sheet } from "../components/Sheet";
 import { AppHeader } from "../components/AppHeader";
+import { toast } from "../core/store/toast";
 import { basename } from "../core/format";
 
 const EXT_LANG: Record<string, string> = {
@@ -21,6 +31,10 @@ const EXT_LANG: Record<string, string> = {
   swift: "swift", kt: "kotlin", lua: "lua", dart: "dart", diff: "diff", patch: "diff", env: "bash",
 };
 const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "avif", "ico"]);
+const BINARY_EXT = new Set([
+  "apk", "aab", "zip", "gz", "tgz", "tar", "7z", "rar", "jar", "exe", "dll", "so", "dylib", "bin",
+  "pdf", "mp4", "mov", "webm", "mkv", "mp3", "wav", "ogg", "flac", "woff", "woff2", "ttf", "otf",
+]);
 
 function ext(path: string): string {
   return path.split(".").pop()?.toLowerCase() ?? "";
@@ -66,6 +80,8 @@ export default function FilesScreen() {
   const [stack, setStack] = useState<Array<string | undefined>>([undefined]);
   const current = stack[stack.length - 1];
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<{ path: string; received: number; total: number } | null>(null);
+  const [saved, setSaved] = useState<{ path: string; uri: string; name: string; location: string } | null>(null);
 
   useEffect(() => {
     if (directory === undefined) {
@@ -117,14 +133,35 @@ export default function FilesScreen() {
   }, [projects, sessions]);
 
   const isImage = openFile ? IMAGE_EXT.has(ext(openFile)) : false;
+  const isBinary = openFile ? BINARY_EXT.has(ext(openFile)) : false;
   const lang = openFile ? EXT_LANG[ext(openFile)] : undefined;
 
   const { data: fileContent, isLoading: fileLoading } = useQuery({
     queryKey: ["fs-read", directory, openFile],
     queryFn: () => api.fsReadText(openFile!, directory),
-    enabled: Boolean(openFile) && !isImage && status === "connected",
+    enabled: Boolean(openFile) && !isImage && !isBinary && status === "connected",
     retry: false,
   });
+
+  const startDownload = async (path: string, open = false) => {
+    if (downloading) return;
+    setDownloading({ path, received: 0, total: 0 });
+    try {
+      const res = await saveFile(path, {
+        directory,
+        open,
+        onProgress: (p) => setDownloading({ path, received: p.received, total: p.total }),
+      });
+      setSaved({ path, uri: res.uri, name: res.name, location: res.path });
+      toast.success(t("files.downloaded"));
+    } catch (err) {
+      toast.error(t("files.downloadError", { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const pct = downloading && downloading.total > 0 ? Math.min(100, Math.round((downloading.received / downloading.total) * 100)) : null;
 
   return (
     <div className="flex h-full flex-col bg-bg">
@@ -161,16 +198,35 @@ export default function FilesScreen() {
               .slice()
               .sort((a, b) => (a.type === b.type ? a.path.localeCompare(b.path) : a.type === "directory" ? -1 : 1))
               .map((entry) => (
-                <button
-                  key={entry.path}
-                  type="button"
-                  onClick={() => (entry.type === "directory" ? setStack((s) => [...s, entry.path]) : setOpenFile(entry.path))}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface2"
-                >
-                  <IonIcon icon={entry.type === "directory" ? folderOutline : documentOutline} className="text-[18px] text-muted" />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg">{basename(entry.path)}</span>
-                  {entry.type === "directory" && <IonIcon icon={chevronForwardOutline} className="text-[16px] text-faint" />}
-                </button>
+                <div key={entry.path} className="flex w-full items-center gap-1 px-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (entry.type === "directory") setStack((s) => [...s, entry.path]);
+                      else setOpenFile(entry.path);
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2.5 text-left active:bg-surface2"
+                  >
+                    <IonIcon icon={entry.type === "directory" ? folderOutline : documentOutline} className="text-[18px] text-muted" />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg">{basename(entry.path)}</span>
+                    {entry.type === "directory" && <IonIcon icon={chevronForwardOutline} className="text-[16px] text-faint" />}
+                  </button>
+                  {entry.type !== "directory" && (
+                    <button
+                      type="button"
+                      onClick={() => void startDownload(entry.path)}
+                      disabled={Boolean(downloading)}
+                      aria-label={t("files.download")}
+                      className="shrink-0 p-2 text-muted active:text-accent disabled:opacity-40"
+                    >
+                      {downloading?.path === entry.path ? (
+                        <IonSpinner name="crescent" style={{ width: 16, height: 16 }} />
+                      ) : (
+                        <IonIcon icon={downloadOutline} className="text-[18px]" />
+                      )}
+                    </button>
+                  )}
+                </div>
               ))}
           </div>
         )}
@@ -201,8 +257,46 @@ export default function FilesScreen() {
         title={<span className="font-mono text-[13px]">{openFile ? basename(openFile) : ""}</span>}
       >
         <div className="p-3">
+          {openFile && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void startDownload(openFile)}
+                disabled={Boolean(downloading)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface2 px-3 py-1.5 text-[12.5px] font-medium text-fg active:bg-surface disabled:opacity-50"
+              >
+                {downloading?.path === openFile ? (
+                  <IonSpinner name="crescent" style={{ width: 14, height: 14 }} />
+                ) : (
+                  <IonIcon icon={downloadOutline} className="text-[15px]" />
+                )}
+                {downloading?.path === openFile
+                  ? pct !== null
+                    ? t("files.downloading", { pct })
+                    : t("files.downloadingUnknown")
+                  : t("files.download")}
+              </button>
+              {saved?.path === openFile && saved.uri && (
+                <button
+                  type="button"
+                  onClick={() => void openSaved(saved.uri, saved.name)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white active:opacity-90"
+                >
+                  <IonIcon icon={openOutline} className="text-[15px]" />
+                  {ext(openFile) === "apk" ? t("files.install") : t("files.open")}
+                </button>
+              )}
+            </div>
+          )}
+          {saved?.path === openFile && (
+            <div className="mb-2 truncate rounded-lg border border-border bg-surface2 px-2.5 py-1.5 font-mono text-[11px] text-muted">
+              {saved.location}
+            </div>
+          )}
           {isImage ? (
             <ImagePreview path={openFile!} directory={directory} />
+          ) : isBinary ? (
+            <div className="p-8 text-center text-[13px] text-muted">{t("files.binary")}</div>
           ) : fileLoading ? (
             <div className="flex justify-center p-8">
               <IonSpinner name="crescent" />
