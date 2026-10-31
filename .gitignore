@@ -42,3 +42,6 @@ ios/DerivedData
 # Local bridge state
 .opencode-remote
 
+
+# Build artifact exposed to the phone via the in-app file browser
+/opencode-remote-debug.apk
