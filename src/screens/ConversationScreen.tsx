@@ -8,6 +8,8 @@ import {
   arrowDownOutline,
   chevronForwardOutline,
   closeCircle,
+  chevronDownOutline,
+  chevronUpOutline,
   ellipsisHorizontal,
   flagOutline,
   layersOutline,
@@ -88,7 +90,7 @@ export default function ConversationScreen() {
     queryKey: ["active-sessions"],
     queryFn: () => api.activeSessions(),
     enabled: status === "connected",
-    refetchInterval: 6000,
+    refetchInterval: 20_000,
   });
   const sessionList = useSessions((s) => s.list);
   const lastModel = useSettings((s) => s.lastModel);
@@ -104,6 +106,10 @@ export default function ConversationScreen() {
         .sort((a, b) => b.time.updated - a.time.updated),
     [sessionList, id],
   );
+  const queue = conv?.inbox ?? [];
+  // Only plain user prompts can be re-admitted, so reordering is offered only when
+  // the whole queue is user prompts (not goal continuations/compactions).
+  const canReorder = queue.length > 1 && queue.every((item) => item.type === "user");
 
   useEffect(() => {
     if (!id || !session) return;
@@ -130,7 +136,7 @@ export default function ConversationScreen() {
     },
     enabled: status === "connected" && Boolean(id) && !goalUnsupported,
     retry: false,
-    refetchInterval: (query) => (query.state.data?.status === "active" ? 5000 : 20_000),
+    refetchInterval: (query) => (query.state.data?.status === "active" ? 15_000 : 60_000),
   });
 
   useEffect(() => {
@@ -143,12 +149,16 @@ export default function ConversationScreen() {
     return () => useSessions.getState().abortLoad(id);
   }, [id]);
 
-  // Stacked prompts are drained by the server as steps finish: keep the queue fresh.
+  // Stacked prompts are drained by the server as steps finish: poll only while
+  // something is actually queued, and never in the background.
   useEffect(() => {
-    if (!id || !conv?.running) return;
-    const timer = setInterval(() => void useSessions.getState().refreshInbox(id), 4000);
+    if (!id || !conv?.running || (conv?.inbox.length ?? 0) === 0) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void useSessions.getState().refreshInbox(id);
+    }, 8000);
     return () => clearInterval(timer);
-  }, [id, conv?.running]);
+  }, [id, conv?.running, conv?.inbox.length]);
 
   useEffect(() => {
     setProjectDir(session?.location?.directory);
@@ -529,11 +539,33 @@ export default function ConversationScreen() {
                 {t("conv.queue.title", { count: conv?.inbox.length ?? 0 })}
               </div>
               <div className="flex flex-col gap-1">
-                {conv?.inbox.map((item) => (
-                  <div key={item.id} className="flex items-center gap-1.5 rounded-lg bg-bg px-2 py-1">
+                {conv?.inbox.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-1 rounded-lg bg-bg px-2 py-1">
                     <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg">
                       {item.payload?.text || item.payload?.description || item.type}
                     </span>
+                    {canReorder && (
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => void useSessions.getState().reorderInbox(id, item.id, -1)}
+                          aria-label={t("conv.queue.up")}
+                          className="p-1 text-faint active:text-fg disabled:opacity-25"
+                        >
+                          <IonIcon icon={chevronUpOutline} className="text-[14px]" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === queue.length - 1}
+                          onClick={() => void useSessions.getState().reorderInbox(id, item.id, 1)}
+                          aria-label={t("conv.queue.down")}
+                          className="p-1 text-faint active:text-fg disabled:opacity-25"
+                        >
+                          <IonIcon icon={chevronDownOutline} className="text-[14px]" />
+                        </button>
+                      </div>
+                    )}
                     {item.type === "user" && item.delivery === "queue" && (
                       <button
                         type="button"

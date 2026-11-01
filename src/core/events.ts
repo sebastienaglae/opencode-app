@@ -53,7 +53,7 @@ class EventStream {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       if (Date.now() - this.lastMessageAt < 70_000) return;
       this.dropSocket();
-    }, 20_000);
+    }, 30_000);
   }
 
   private stopWatchdog(): void {

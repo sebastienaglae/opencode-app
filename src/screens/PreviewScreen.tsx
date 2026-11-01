@@ -27,7 +27,7 @@ export default function PreviewScreen() {
     queryFn: () => api.listServers(),
     enabled: status === "connected" && settings.previewAllowed,
     retry: false,
-    refetchInterval: 15000,
+    refetchInterval: 30_000,
   });
 
   const servers = data?.servers ?? [];

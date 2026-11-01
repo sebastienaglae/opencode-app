@@ -319,7 +319,10 @@ export type InboxItem = {
   payload?: {
     text?: string;
     description?: string;
-    files?: Array<{ name?: string; mime?: string }>;
+    files?: Array<{ name?: string; mime?: string; uri?: string }>;
+    agents?: unknown[];
+    skills?: unknown[];
+    metadata?: Record<string, unknown>;
   };
 };
 

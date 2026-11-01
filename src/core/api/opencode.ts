@@ -172,7 +172,16 @@ export const api = {
 
   prompt: (
     id: string,
-    body: { text: string; files?: PromptFileInput[]; agent?: string; delivery?: "steer" | "queue" },
+    body: {
+      id?: string;
+      text: string;
+      files?: PromptFileInput[];
+      agent?: string;
+      delivery?: "steer" | "queue";
+      metadata?: Record<string, unknown>;
+      agents?: unknown[];
+      skills?: unknown[];
+    },
   ) => request<unknown>(`/api/session/${id}/prompt`, { method: "POST", body: JSON.stringify(body) }, 120_000),
 
   runCommand: (

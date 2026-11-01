@@ -23,6 +23,8 @@ import { emptyTokens } from "../types";
 
 const RECENT_PAGE = 50;
 const OLDER_PAGE = 50;
+/** Serializes queue reorders (cancel + re-enqueue) so double taps cannot interleave. */
+let inboxReorderBusy = false;
 
 export type Conversation = {
   id: string;
@@ -84,6 +86,7 @@ type SessionsState = {
   refreshInbox: (id: string) => Promise<void>;
   cancelInbox: (id: string, inboxID: string) => Promise<void>;
   setInboxDelivery: (id: string, inboxID: string, delivery: InboxDelivery) => Promise<void>;
+  reorderInbox: (id: string, inboxID: string, direction: -1 | 1) => Promise<void>;
   interrupt: (id: string) => Promise<void>;
   replyForm: (id: string, formID: string, answer: Record<string, unknown>) => Promise<void>;
   replyPermission: (id: string, requestID: string, decision: PermissionReply) => Promise<void>;
@@ -403,6 +406,48 @@ export const useSessions = create<SessionsState>((set, get) => {
       }
     },
 
+    reorderInbox: async (id, inboxID, direction) => {
+      const conv = get().conversations[id];
+      if (!conv || inboxReorderBusy) return;
+      const items = conv.inbox;
+      if (items.length < 2) return;
+      // Only user prompts can be re-admitted. Synthetic/compaction/move entries are
+      // owned by the server (goal loop, compaction) and must keep their position.
+      if (items.some((i) => i.type !== "user")) return;
+      const index = items.findIndex((i) => i.id === inboxID);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= items.length) return;
+
+      const next = items.slice();
+      [next[index], next[target]] = [next[target], next[index]];
+      inboxReorderBusy = true;
+      withConv(id, (c) => ({ ...c, inbox: next }));
+      try {
+        // OpenCode 2.2.x exposes no reorder call: the queue is ordered by admission,
+        // so cancel the pending prompts and re-admit them in the new order. Message
+        // IDs are preserved, so timestamps/transcript stay consistent once delivered.
+        await Promise.all(items.map((i) => api.cancelInbox(id, i.id).catch(() => undefined)));
+        for (const item of next) {
+          const text = item.payload?.text ?? "";
+          if (!text) continue;
+          await api
+            .prompt(id, {
+              id: item.id,
+              text,
+              files: item.payload?.files as PromptFileInput[] | undefined,
+              agents: item.payload?.agents,
+              skills: item.payload?.skills,
+              metadata: item.payload?.metadata,
+              delivery: "queue",
+            })
+            .catch(() => undefined);
+        }
+      } finally {
+        inboxReorderBusy = false;
+        await get().refreshInbox(id);
+      }
+    },
+
     interrupt: async (id) => {
       try {
         await api.interrupt(id);
@@ -513,7 +558,8 @@ export const useSessions = create<SessionsState>((set, get) => {
             if (mid) next = ensureAssistantMessage(next, mid, { created: d.started, agent: d.agent, model: d.model });
             return next;
           });
-          void get().refreshInbox(sid);
+          // The queue only changes at execution boundaries, not at every step.
+          if (t === "session.execution.started") void get().refreshInbox(sid);
           return;
         }
         case "session.execution.failed": {

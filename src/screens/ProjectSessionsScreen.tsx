@@ -39,7 +39,7 @@ export default function ProjectSessionsScreen() {
     queryFn: () => api.activeSessions(),
     enabled: status === "connected",
     retry: false,
-    refetchInterval: 6000,
+    refetchInterval: 20_000,
   });
 
   useEffect(() => {
