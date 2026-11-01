@@ -85,6 +85,11 @@ Android app ──HTTP + WebSocket──► companion bridge (Node) ──localh
 **Windows tray**
 - `tray\start-tray.cmd` shows a **system-tray icon** with a panel to view the **QR code**, copy the
   pairing link, and start/stop the bridge (reads `~/.opencode-remote/state.json`).
+- **Starts with Windows**: `scripts\install-autostart.ps1` drops a shortcut in the Startup folder that
+  runs `tray\start-all.vbs` → `start-all.ps1`. At logon it starts the **headless OpenCode service**
+  (`opencode-cli.exe serve --service`) if needed, then the **bridge (TLS, token preserved)** and the
+  tray. The bridge waits for OpenCode instead of exiting, so a slow desktop start is harmless.
+  Actions are logged to `~/.opencode-remote/startup.log` (bridge output: `bridge.log` / `bridge.err.log`).
 
 **Preview**
 - **In-app preview** of what OpenCode produced: the bridge probes common dev-server ports

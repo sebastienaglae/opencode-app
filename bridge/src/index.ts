@@ -28,14 +28,18 @@ function localAddresses(): string[] {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const config = loadConfig(opts);
+  let config = loadConfig(opts);
 
   if (!config.opencodeUrl) {
-    console.error(
-      "\n[bridge] No OpenCode service found.\n" +
-        "  Start OpenCode (Desktop/TUI) first, or pass --server <url> [--password <secret>].\n",
-    );
-    process.exit(1);
+    // Started at logon the bridge often wins the race against OpenCode Desktop.
+    // Wait for the shared service instead of exiting, so the phone can reach it
+    // as soon as OpenCode is up.
+    console.log("[bridge] Waiting for the OpenCode service… (start OpenCode Desktop/TUI)");
+    while (!config.opencodeUrl) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      config = loadConfig(opts);
+    }
+    console.log(`[bridge] OpenCode service found at ${config.opencodeUrl}`);
   }
 
   const client = new OpenCodeClient(config.opencodeUrl, config.opencodePassword);
