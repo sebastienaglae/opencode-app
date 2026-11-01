@@ -345,7 +345,10 @@ export const useSessions = create<SessionsState>((set, get) => {
 
     sendPrompt: async (id, text, files, agent, delivery) => {
       get().ensureConversation(id);
-      const queued = delivery === "queue" && Boolean(get().conversations[id]?.running);
+      // Queue by default: even if the screen has not caught up with the running
+      // state yet, a prompt must never hijack the current turn.
+      const mode: InboxDelivery = delivery ?? "queue";
+      const queued = mode === "queue" && Boolean(get().conversations[id]?.running);
       const optimistic: MessageInfo = {
         type: "user",
         id: `msg_local_${crypto.randomUUID()}`,
@@ -362,8 +365,24 @@ export const useSessions = create<SessionsState>((set, get) => {
         messages: queued ? c.messages : [...c.messages, optimistic],
       }));
       try {
-        await api.prompt(id, { text, files, agent, delivery });
-        if (queued) await get().refreshInbox(id);
+        const res = await api.prompt(id, { text, files, agent, delivery: mode });
+        if (mode === "queue") {
+          await get().refreshInbox(id);
+          const inbox = get().conversations[id]?.inbox ?? [];
+          // The running flag can be stale right after opening a conversation: if
+          // the server admitted the prompt to the inbox, move it to the queue row.
+          const stillQueued = res?.id
+            ? inbox.some((item) => item.id === res.id)
+            : inbox.some((item) => item.payload?.text === text);
+          if (stillQueued) {
+            withConv(id, (c) => ({
+              ...c,
+              running: true,
+              status: { type: "busy" },
+              messages: c.messages.filter((m) => m.id !== optimistic.id),
+            }));
+          }
+        }
       } catch (err) {
         withConv(id, (c) => ({
           ...c,

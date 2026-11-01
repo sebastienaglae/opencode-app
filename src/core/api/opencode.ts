@@ -182,7 +182,7 @@ export const api = {
       agents?: unknown[];
       skills?: unknown[];
     },
-  ) => request<unknown>(`/api/session/${id}/prompt`, { method: "POST", body: JSON.stringify(body) }, 120_000),
+  ) => request<InboxItem>(`/api/session/${id}/prompt`, { method: "POST", body: JSON.stringify(body) }, 120_000),
 
   runCommand: (
     id: string,

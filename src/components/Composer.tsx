@@ -220,7 +220,7 @@ export function Composer({
       await onSend(
         trimmed,
         attachments.map((a) => ({ uri: a.uri, name: a.name, mime: a.mime })),
-        running ? delivery : undefined,
+        delivery,
       );
       setText("");
       setAttachments([]);

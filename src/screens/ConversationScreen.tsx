@@ -598,7 +598,7 @@ export default function ConversationScreen() {
 
       <Composer
         sessionID={id}
-        running={Boolean(conv?.running)}
+        running={Boolean(conv?.running) || Boolean(activeMap[id]) || (conv?.inbox.length ?? 0) > 0}
         onSend={handleSend}
         onStop={() => void useSessions.getState().interrupt(id)}
         onShell={runShell}
