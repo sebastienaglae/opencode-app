@@ -429,24 +429,25 @@ export const useSessions = create<SessionsState>((set, get) => {
       const conv = get().conversations[id];
       if (!conv || inboxReorderBusy) return;
       const items = conv.inbox;
-      if (items.length < 2) return;
-      // Only user prompts can be re-admitted. Synthetic/compaction/move entries are
-      // owned by the server (goal loop, compaction) and must keep their position.
-      if (items.some((i) => i.type !== "user")) return;
-      const index = items.findIndex((i) => i.id === inboxID);
+      const users = items.filter((i) => i.type === "user");
+      if (users.length < 2) return;
+      const index = users.findIndex((i) => i.id === inboxID);
       const target = index + direction;
-      if (index < 0 || target < 0 || target >= items.length) return;
+      if (index < 0 || target < 0 || target >= users.length) return;
 
-      const next = items.slice();
-      [next[index], next[target]] = [next[target], next[index]];
+      const nextUsers = users.slice();
+      [nextUsers[index], nextUsers[target]] = [nextUsers[target], nextUsers[index]];
+      // Server-owned entries (goal continuations, compactions) cannot be re-admitted
+      // and keep their place; the re-admitted prompts therefore come after them.
+      const reordered = [...items.filter((i) => i.type !== "user"), ...nextUsers];
       inboxReorderBusy = true;
-      withConv(id, (c) => ({ ...c, inbox: next }));
+      withConv(id, (c) => ({ ...c, inbox: reordered }));
       try {
         // OpenCode 2.2.x exposes no reorder call: the queue is ordered by admission,
         // so cancel the pending prompts and re-admit them in the new order. Message
         // IDs are preserved, so timestamps/transcript stay consistent once delivered.
-        await Promise.all(items.map((i) => api.cancelInbox(id, i.id).catch(() => undefined)));
-        for (const item of next) {
+        await Promise.all(users.map((i) => api.cancelInbox(id, i.id).catch(() => undefined)));
+        for (const item of nextUsers) {
           const text = item.payload?.text ?? "";
           if (!text) continue;
           await api

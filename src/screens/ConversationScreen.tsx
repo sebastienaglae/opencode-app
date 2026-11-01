@@ -107,9 +107,10 @@ export default function ConversationScreen() {
     [sessionList, id],
   );
   const queue = conv?.inbox ?? [];
-  // Only plain user prompts can be re-admitted, so reordering is offered only when
-  // the whole queue is user prompts (not goal continuations/compactions).
-  const canReorder = queue.length > 1 && queue.every((item) => item.type === "user");
+  // User prompts can be reordered even when the queue also holds server-owned
+  // entries (goal continuations, compactions); those keep their place.
+  const userQueue = useMemo(() => queue.filter((item) => item.type === "user"), [queue]);
+  const canReorder = userQueue.length > 1;
 
   useEffect(() => {
     if (!id || !session) return;
@@ -539,57 +540,60 @@ export default function ConversationScreen() {
                 {t("conv.queue.title", { count: conv?.inbox.length ?? 0 })}
               </div>
               <div className="flex flex-col gap-1">
-                {conv?.inbox.map((item, index) => (
-                  <div key={item.id} className="flex items-center gap-1 rounded-lg bg-bg px-2 py-1">
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg">
-                      {item.payload?.text || item.payload?.description || item.type}
-                    </span>
-                    {canReorder && (
-                      <div className="flex shrink-0 items-center gap-0.5">
+                {conv?.inbox.map((item) => {
+                  const userIndex = item.type === "user" ? userQueue.findIndex((u) => u.id === item.id) : -1;
+                  return (
+                    <div key={item.id} className="flex items-center gap-1 rounded-lg bg-bg px-2 py-1">
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg">
+                        {item.payload?.text || item.payload?.description || item.type}
+                      </span>
+                      {canReorder && item.type === "user" && (
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={userIndex <= 0}
+                            onClick={() => void useSessions.getState().reorderInbox(id, item.id, -1)}
+                            aria-label={t("conv.queue.up")}
+                            className="p-1 text-faint active:text-fg disabled:opacity-25"
+                          >
+                            <IonIcon icon={chevronUpOutline} className="text-[14px]" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={userIndex < 0 || userIndex >= userQueue.length - 1}
+                            onClick={() => void useSessions.getState().reorderInbox(id, item.id, 1)}
+                            aria-label={t("conv.queue.down")}
+                            className="p-1 text-faint active:text-fg disabled:opacity-25"
+                          >
+                            <IonIcon icon={chevronDownOutline} className="text-[14px]" />
+                          </button>
+                        </div>
+                      )}
+                      {item.type === "user" && item.delivery === "queue" && (
                         <button
                           type="button"
-                          disabled={index === 0}
-                          onClick={() => void useSessions.getState().reorderInbox(id, item.id, -1)}
-                          aria-label={t("conv.queue.up")}
-                          className="p-1 text-faint active:text-fg disabled:opacity-25"
+                          onClick={() => void useSessions.getState().setInboxDelivery(id, item.id, "steer")}
+                          className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10.5px] text-accent"
                         >
-                          <IonIcon icon={chevronUpOutline} className="text-[14px]" />
+                          {t("conv.queue.steer")}
                         </button>
-                        <button
-                          type="button"
-                          disabled={index === queue.length - 1}
-                          onClick={() => void useSessions.getState().reorderInbox(id, item.id, 1)}
-                          aria-label={t("conv.queue.down")}
-                          className="p-1 text-faint active:text-fg disabled:opacity-25"
-                        >
-                          <IonIcon icon={chevronDownOutline} className="text-[14px]" />
-                        </button>
-                      </div>
-                    )}
-                    {item.type === "user" && item.delivery === "queue" && (
+                      )}
+                      {item.delivery === "steer" && (
+                        <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10.5px] text-accent">
+                          {t("conv.delivery.steer")}
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => void useSessions.getState().setInboxDelivery(id, item.id, "steer")}
-                        className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10.5px] text-accent"
+                        onClick={() => void useSessions.getState().cancelInbox(id, item.id)}
+                        aria-label={t("conv.queue.cancel")}
+                        className="shrink-0 text-[15px] text-faint active:text-danger"
                       >
-                        {t("conv.queue.steer")}
+                        <IonIcon icon={closeCircle} />
                       </button>
-                    )}
-                    {item.delivery === "steer" && (
-                      <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10.5px] text-accent">
-                        {t("conv.delivery.steer")}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void useSessions.getState().cancelInbox(id, item.id)}
-                      aria-label={t("conv.queue.cancel")}
-                      className="shrink-0 text-[15px] text-faint active:text-danger"
-                    >
-                      <IonIcon icon={closeCircle} />
-                    </button>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
